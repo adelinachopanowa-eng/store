@@ -1,0 +1,294 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { GroupBalance } from "@/lib/types";
+import { fmtKg, fmtLv, fmtPrice, fmtPct, fmtDate } from "@/lib/format";
+import { PageHeader, Loading, Stat } from "@/components/ui";
+
+type Report = "stock" | "deliveries" | "sales" | "unpaid";
+
+function toCSV(rows: Record<string, any>[]): string {
+  if (!rows.length) return "";
+  const headers = Object.keys(rows[0]);
+  const lines = [headers.join(";")];
+  for (const r of rows) {
+    lines.push(headers.map((h) => `"${String(r[h] ?? "").replace(/"/g, '""')}"`).join(";"));
+  }
+  return "﻿" + lines.join("\n");
+}
+function download(name: string, csv: string) {
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export default function ReportsPage() {
+  const [report, setReport] = useState<Report>("stock");
+  const today = new Date().toISOString().slice(0, 10);
+  const monthAgo = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
+  const [from, setFrom] = useState(monthAgo);
+  const [to, setTo] = useState(today);
+  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState<any[]>([]);
+
+  async function load() {
+    setLoading(true);
+    const fromTs = new Date(from + "T00:00:00").toISOString();
+    const toTs = new Date(to + "T23:59:59").toISOString();
+    if (report === "stock") {
+      const { data: d } = await supabase.from("wh_group_balances").select("*").order("group_name");
+      setData(d || []);
+    } else if (report === "deliveries") {
+      const { data: d } = await supabase
+        .from("wh_deliveries")
+        .select("*, wh_suppliers(name), wh_materials(name)")
+        .gte("doc_date", fromTs)
+        .lte("doc_date", toTs)
+        .order("doc_date", { ascending: false });
+      setData(d || []);
+    } else if (report === "sales") {
+      const { data: d } = await supabase
+        .from("wh_sales")
+        .select("*, wh_groups(name), wh_suppliers(name)")
+        .gte("doc_date", fromTs)
+        .lte("doc_date", toTs)
+        .order("doc_date", { ascending: false });
+      setData(d || []);
+    } else if (report === "unpaid") {
+      const [del, sal] = await Promise.all([
+        supabase.from("wh_deliveries").select("*, wh_suppliers(name)").eq("paid", false),
+        supabase.from("wh_sales").select("*, wh_suppliers(name)").eq("paid", false),
+      ]);
+      setData([
+        ...(del.data || []).map((x: any) => ({ ...x, _kind: "Доставка", _party: x.wh_suppliers?.name || x.supplier_name, _amount: x.total_value })),
+        ...(sal.data || []).map((x: any) => ({ ...x, _kind: "Продажба", _party: x.wh_suppliers?.name || x.buyer_name, _amount: x.sale_value })),
+      ]);
+    }
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [report]);
+
+  function exportCSV() {
+    let rows: any[] = [];
+    if (report === "stock")
+      rows = (data as GroupBalance[]).map((r) => ({
+        Група: r.group_name,
+        Материал: r.material_name,
+        "Наличност кг": Number(r.quantity_kg).toFixed(2),
+        "Средна цена": Number(r.avg_price).toFixed(4),
+        "Стойност лв": Number(r.total_value).toFixed(2),
+        "Среден отбив %": Number(r.avg_deduction_pct).toFixed(2),
+      }));
+    else if (report === "deliveries")
+      rows = data.map((d) => ({
+        Дата: fmtDate(d.doc_date),
+        Документ: d.doc_number,
+        Доставчик: d.wh_suppliers?.name || d.supplier_name,
+        Материал: d.wh_materials?.name,
+        "Нето кг": d.net_quantity,
+        "Отбив кг": d.deduction_kg,
+        "Заприходено кг": d.accounted_quantity,
+        "Цена": d.unit_price,
+        "Стойност лв": d.total_value,
+        Плащане: d.payment_method === "bank" ? "Банка" : "Брой",
+        Платено: d.paid ? "Да" : "Не",
+      }));
+    else if (report === "sales")
+      rows = data.map((s) => ({
+        Дата: fmtDate(s.doc_date),
+        Документ: s.doc_number,
+        Група: s.wh_groups?.name,
+        Купувач: s.wh_suppliers?.name || s.buyer_name,
+        "Кол-во кг": s.quantity_kg,
+        "Себестойност": s.avg_cost,
+        "Прод. цена": s.unit_price,
+        "Приход лв": s.sale_value,
+        "Печалба лв": s.sale_value != null ? (s.sale_value - s.cost_value).toFixed(2) : "",
+        Платено: s.paid ? "Да" : "Не",
+      }));
+    else if (report === "unpaid")
+      rows = data.map((x) => ({
+        Тип: x._kind,
+        Дата: fmtDate(x.doc_date),
+        Контрагент: x._party,
+        "Сума лв": x._amount,
+        Плащане: x.payment_method === "bank" ? "Банка" : "Брой",
+      }));
+    download(`spravka_${report}_${today}.csv`, toCSV(rows));
+  }
+
+  return (
+    <div>
+      <PageHeader
+        title="Справки"
+        subtitle="Генериране и експорт на справки"
+        actions={
+          <button className="btn-secondary" onClick={exportCSV} disabled={!data.length}>
+            ⬇ Експорт CSV
+          </button>
+        }
+      />
+
+      <div className="flex flex-wrap gap-2 mb-4">
+        {([
+          ["stock", "Складови наличности"],
+          ["deliveries", "Доставки за период"],
+          ["sales", "Продажби и печалба"],
+          ["unpaid", "Неплатени"],
+        ] as [Report, string][]).map(([v, l]) => (
+          <button key={v} className={report === v ? "btn-primary" : "btn-secondary"} onClick={() => setReport(v)}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {(report === "deliveries" || report === "sales") && (
+        <div className="flex gap-3 mb-4 items-end">
+          <div>
+            <label className="label">От дата</label>
+            <input type="date" className="input" value={from} onChange={(e) => setFrom(e.target.value)} />
+          </div>
+          <div>
+            <label className="label">До дата</label>
+            <input type="date" className="input" value={to} onChange={(e) => setTo(e.target.value)} />
+          </div>
+          <button className="btn-primary" onClick={load}>
+            Покажи
+          </button>
+        </div>
+      )}
+
+      {loading ? <Loading /> : <ReportTable report={report} data={data} />}
+    </div>
+  );
+}
+
+function ReportTable({ report, data }: { report: Report; data: any[] }) {
+  if (report === "stock") {
+    const totVal = data.reduce((s, r) => s + Number(r.total_value), 0);
+    const totQty = data.reduce((s, r) => s + Number(r.quantity_kg), 0);
+    return (
+      <>
+        <div className="grid grid-cols-3 gap-4 mb-4">
+          <Stat label="Общо наличност" value={fmtKg(totQty)} color="blue" />
+          <Stat label="Складова стойност" value={fmtLv(totVal)} color="green" />
+          <Stat label="Групи" value={String(data.length)} />
+        </div>
+        <Table
+          head={["Група", "Материал", "Наличност", "Средна цена", "Стойност", "Ср. отбив"]}
+          rows={data.map((r) => [r.group_name, r.material_name || "—", fmtKg(r.quantity_kg), fmtPrice(r.avg_price), fmtLv(r.total_value), fmtPct(r.avg_deduction_pct)])}
+        />
+      </>
+    );
+  }
+  if (report === "deliveries") {
+    const tot = data.reduce((s, d) => s + Number(d.total_value), 0);
+    const totKg = data.reduce((s, d) => s + Number(d.accounted_quantity), 0);
+    return (
+      <>
+        <div className="grid grid-cols-3 gap-4 mb-4">
+          <Stat label="Брой доставки" value={String(data.length)} />
+          <Stat label="Заприходено" value={fmtKg(totKg)} color="blue" />
+          <Stat label="Обща стойност" value={fmtLv(tot)} color="green" />
+        </div>
+        <Table
+          head={["Дата", "Доставчик", "Материал", "Заприх.", "Цена", "Стойност", "Плащане"]}
+          rows={data.map((d) => [
+            fmtDate(d.doc_date),
+            d.wh_suppliers?.name || d.supplier_name || "—",
+            d.wh_materials?.name || "—",
+            fmtKg(d.accounted_quantity),
+            fmtPrice(d.unit_price),
+            fmtLv(d.total_value),
+            `${d.payment_method === "bank" ? "Банка" : "Брой"} · ${d.paid ? "Платено" : "Не"}`,
+          ])}
+        />
+      </>
+    );
+  }
+  if (report === "sales") {
+    const rev = data.reduce((s, x) => s + Number(x.sale_value || 0), 0);
+    const cost = data.reduce((s, x) => s + Number(x.cost_value || 0), 0);
+    return (
+      <>
+        <div className="grid grid-cols-4 gap-4 mb-4">
+          <Stat label="Брой продажби" value={String(data.length)} />
+          <Stat label="Приход" value={fmtLv(rev)} color="green" />
+          <Stat label="Себестойност" value={fmtLv(cost)} />
+          <Stat label="Печалба" value={fmtLv(rev - cost)} color={rev - cost >= 0 ? "green" : "red"} />
+        </div>
+        <Table
+          head={["Дата", "Група", "Купувач", "Кол-во", "Себест.", "Приход", "Печалба"]}
+          rows={data.map((s) => [
+            fmtDate(s.doc_date),
+            s.wh_groups?.name || "—",
+            s.wh_suppliers?.name || s.buyer_name || "—",
+            fmtKg(s.quantity_kg),
+            fmtLv(s.cost_value),
+            s.sale_value != null ? fmtLv(s.sale_value) : "—",
+            s.sale_value != null ? fmtLv(s.sale_value - s.cost_value) : "—",
+          ])}
+        />
+      </>
+    );
+  }
+  // unpaid
+  const tot = data.reduce((s, x) => s + Number(x._amount || 0), 0);
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        <Stat label="Брой неплатени" value={String(data.length)} color="amber" />
+        <Stat label="Обща сума" value={fmtLv(tot)} color="red" />
+      </div>
+      <Table
+        head={["Тип", "Дата", "Контрагент", "Сума", "Плащане"]}
+        rows={data.map((x) => [
+          x._kind,
+          fmtDate(x.doc_date),
+          x._party || "—",
+          fmtLv(x._amount),
+          x.payment_method === "bank" ? "Банка" : "Брой",
+        ])}
+      />
+    </>
+  );
+}
+
+function Table({ head, rows }: { head: string[]; rows: (string | number)[][] }) {
+  if (!rows.length) return <div className="card p-10 text-center text-slate-400 text-sm">Няма данни.</div>;
+  return (
+    <div className="card overflow-hidden">
+      <table className="w-full">
+        <thead className="bg-slate-50">
+          <tr>
+            {head.map((h, i) => (
+              <th key={i} className={`th ${i >= 3 ? "text-right" : ""}`}>
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={i} className="hover:bg-slate-50">
+              {r.map((c, j) => (
+                <td key={j} className={`td ${j >= 3 ? "text-right" : ""}`}>
+                  {c}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
