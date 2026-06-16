@@ -82,9 +82,9 @@ export default function ReportsPage() {
     if (report === "stock")
       rows = (data as MaterialBalance[]).map((r) => ({
         Материал: r.material_name,
-        "Наличност кг": Number(r.quantity_kg).toFixed(2),
-        "Средна цена": Number(r.avg_price).toFixed(4),
-        "Стойност лв": Number(r.total_value).toFixed(2),
+        "Наличност т": Number(r.quantity_kg).toFixed(3),
+        "Средна цена €/т": Number(r.avg_price).toFixed(2),
+        "Стойност €": Number(r.total_value).toFixed(2),
         "Среден отбив %": Number(r.avg_deduction_pct).toFixed(2),
       }));
     else if (report === "deliveries")
@@ -92,11 +92,11 @@ export default function ReportsPage() {
         Дата: fmtDate(d.doc_date),
         Документ: d.doc_number,
         Доставчик: d.wh_suppliers?.name || d.supplier_name,
-        "Нето кг": d.net_quantity,
-        "Отбив кг": d.deduction_kg,
-        "Заприходено кг": d.accounted_quantity,
-        "Цена": d.unit_price,
-        "Стойност лв": d.total_value,
+        "Нето т": d.net_quantity,
+        "Отбив т": d.deduction_kg,
+        "Отбив %": Number(d.deduction_pct).toFixed(2),
+        "Цена €/т": d.unit_price,
+        "Стойност €": d.total_value,
         Плащане: d.payment_method === "bank" ? "Банка" : "Брой",
         Платено: d.paid ? "Да" : "Не",
       }));
@@ -106,11 +106,11 @@ export default function ReportsPage() {
         Документ: s.doc_number,
         Материал: s.wh_materials?.name,
         Купувач: s.wh_suppliers?.name || s.buyer_name,
-        "Кол-во кг": s.quantity_kg,
-        "Себестойност": s.avg_cost,
-        "Прод. цена": s.unit_price,
-        "Приход лв": s.sale_value,
-        "Печалба лв": s.sale_value != null ? (s.sale_value - s.cost_value).toFixed(2) : "",
+        "Кол-во т": s.quantity_kg,
+        "Себестойност €/т": s.avg_cost,
+        "Прод. цена €/т": s.unit_price,
+        "Приход €": s.sale_value,
+        "Печалба €": s.sale_value != null ? (s.sale_value - s.cost_value).toFixed(2) : "",
         Платено: s.paid ? "Да" : "Не",
       }));
     else if (report === "unpaid")
@@ -118,7 +118,7 @@ export default function ReportsPage() {
         Тип: x._kind,
         Дата: fmtDate(x.doc_date),
         Контрагент: x._party,
-        "Сума лв": x._amount,
+        "Сума €": x._amount,
         Плащане: x.payment_method === "bank" ? "Банка" : "Брой",
       }));
     download(`spravka_${report}_${today}.csv`, toCSV(rows));
@@ -196,12 +196,12 @@ function ReportTable({ report, data }: { report: Report; data: any[] }) {
       <>
         <div className="grid grid-cols-3 gap-4 mb-4">
           <Stat label="Брой доставки" value={String(data.length)} />
-          <Stat label="Заприходено" value={fmtKg(totKg)} color="blue" />
+          <Stat label="Нето (чисто)" value={fmtKg(totKg)} color="blue" />
           <Stat label="Обща стойност" value={fmtLv(tot)} color="green" />
         </div>
         <Table
           rightFrom={2}
-          head={["Дата", "Доставчик", "Заприх.", "Цена", "Стойност", "Плащане"]}
+          head={["Дата", "Доставчик", "Нето", "Цена", "Стойност", "Плащане"]}
           rows={data.map((d) => [
             fmtDate(d.doc_date),
             d.wh_suppliers?.name || d.supplier_name || "—",

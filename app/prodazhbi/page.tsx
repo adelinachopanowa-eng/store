@@ -209,10 +209,10 @@ export default function SalesPage() {
           </FormGrid>
 
           <FormGrid cols={3}>
-            <Field label="Количество (кг)" required>
-              <input className="input" type="number" step="0.01" value={qty} onChange={(e) => setQty(e.target.value)} />
+            <Field label="Количество (т)" required>
+              <input className="input" type="number" step="0.001" value={qty} onChange={(e) => setQty(e.target.value)} />
             </Field>
-            <Field label="Продажна цена (лв/кг)">
+            <Field label="Продажна цена (€/т)">
               <input className="input" type="number" step="0.0001" value={price} onChange={(e) => setPrice(e.target.value)} />
             </Field>
             <Field label="Документ №">

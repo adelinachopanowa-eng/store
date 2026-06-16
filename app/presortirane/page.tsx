@@ -181,8 +181,8 @@ export default function TransfersPage() {
                   ))}
               </select>
             </Field>
-            <Field label="Количество (кг)" required>
-              <input className="input" type="number" step="0.01" value={qty} onChange={(e) => setQty(e.target.value)} />
+            <Field label="Количество (т)" required>
+              <input className="input" type="number" step="0.001" value={qty} onChange={(e) => setQty(e.target.value)} />
             </Field>
           </FormGrid>
 

@@ -37,7 +37,7 @@ function Materials() {
   const [rows, setRows] = useState<Material[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
-  const [f, setF] = useState({ name: "", code: "", waste_code: "", unit: "кг", default_price: "" });
+  const [f, setF] = useState({ name: "", code: "", waste_code: "", unit: "т", default_price: "" });
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -62,12 +62,12 @@ function Materials() {
       name: f.name.trim(),
       code: f.code || null,
       waste_code: f.waste_code || null,
-      unit: f.unit || "кг",
+      unit: f.unit || "т",
       default_price: f.default_price ? Number(f.default_price) : null,
     });
     setSaving(false);
     if (error) return setErr(error.message);
-    setF({ name: "", code: "", waste_code: "", unit: "кг", default_price: "" });
+    setF({ name: "", code: "", waste_code: "", unit: "т", default_price: "" });
     setOpen(false);
     load();
   }
@@ -125,7 +125,7 @@ function Materials() {
             <Field label="Мярка">
               <input className="input" value={f.unit} onChange={(e) => setF({ ...f, unit: e.target.value })} />
             </Field>
-            <Field label="Ориент. цена (лв/кг)">
+            <Field label="Ориент. цена (€/т)">
               <input className="input" type="number" step="0.0001" value={f.default_price} onChange={(e) => setF({ ...f, default_price: e.target.value })} />
             </Field>
           </FormGrid>

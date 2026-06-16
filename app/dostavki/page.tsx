@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { MaterialBalance, Supplier } from "@/lib/types";
-import { fmtKg, fmtLv, fmtPrice, fmtDate } from "@/lib/format";
+import { fmtKg, fmtLv, fmtPrice, fmtPct, fmtDate } from "@/lib/format";
 import {
   PageHeader,
   Loading,
@@ -67,11 +67,21 @@ export default function DeliveriesPage() {
     loadList();
   }, []);
 
+  // Нетното Е чистото количество (заприходеното). Отбивът е само за статистика.
   const netN = Number(net) || 0;
-  const dedKg = dedMode === "kg" ? Number(ded) || 0 : (netN * (Number(ded) || 0)) / 100;
-  const accounted = Math.max(netN - dedKg, 0);
+  const accounted = netN; // влиза директно в наличността
+  const dedPctIn = Number(ded) || 0;
+  // отбив в тонове: ако е въведен в %, се тълкува като % от брутото
+  const dedTons =
+    dedMode === "kg"
+      ? Number(ded) || 0
+      : dedPctIn > 0 && dedPctIn < 100
+      ? (netN * dedPctIn) / (100 - dedPctIn)
+      : 0;
+  const gross = netN + dedTons;
+  const dedPct = gross > 0 ? (dedTons / gross) * 100 : 0;
   const priceN = Number(price) || 0;
-  const total = accounted * priceN;
+  const total = netN * priceN;
 
   const allocKg = useMemo(
     () => allocs.map((a) => (a.mode === "pct" ? (accounted * (Number(a.amount) || 0)) / 100 : Number(a.amount) || 0)),
@@ -96,11 +106,11 @@ export default function DeliveriesPage() {
 
   async function save() {
     setErr("");
-    if (accounted <= 0) return setErr("Въведете нетно количество и отбив.");
+    if (netN <= 0) return setErr("Въведете нетно количество.");
     if (priceN <= 0) return setErr("Въведете изкупна цена.");
     if (allocs.some((a) => !a.mat.name.trim())) return setErr("Изберете или въведете материал за всеки ред.");
     if (!allocOk)
-      return setErr(`Сборът на материалите (${sumAlloc.toFixed(2)} кг) трябва да е равен на заприходеното (${accounted.toFixed(2)} кг).`);
+      return setErr(`Сборът на материалите (${sumAlloc.toFixed(3)} т) трябва да е равен на нетното количество (${netN.toFixed(3)} т).`);
 
     setSaving(true);
     try {
@@ -119,7 +129,7 @@ export default function DeliveriesPage() {
         p_supplier_id: supplier.id,
         p_supplier_name: supplier.id ? null : supplier.name || null,
         p_net_quantity: netN,
-        p_deduction_kg: dedKg,
+        p_deduction_kg: dedTons,
         p_unit_price: priceN,
         p_payment_method: pay,
         p_paid: paid,
@@ -173,7 +183,7 @@ export default function DeliveriesPage() {
                 <th className="th">Доставчик</th>
                 <th className="th text-right">Нето</th>
                 <th className="th text-right">Отбив</th>
-                <th className="th text-right">Заприх.</th>
+                <th className="th text-right">Отбив %</th>
                 <th className="th text-right">Цена</th>
                 <th className="th text-right">Стойност</th>
                 <th className="th">Плащане</th>
@@ -188,7 +198,7 @@ export default function DeliveriesPage() {
                   <td className="td">{d.wh_suppliers?.name || d.supplier_name || "—"}</td>
                   <td className="td text-right">{fmtKg(d.net_quantity)}</td>
                   <td className="td text-right">{fmtKg(d.deduction_kg)}</td>
-                  <td className="td text-right">{fmtKg(d.accounted_quantity)}</td>
+                  <td className="td text-right">{fmtPct(d.deduction_pct)}</td>
                   <td className="td text-right">{fmtPrice(d.unit_price)}</td>
                   <td className="td text-right font-medium">{fmtLv(d.total_value)}</td>
                   <td className="td">
@@ -238,31 +248,31 @@ export default function DeliveriesPage() {
           </FormGrid>
 
           <FormGrid cols={4}>
-            <Field label="Нетно (кг)" required>
-              <input className="input" type="number" step="0.01" value={net} onChange={(e) => setNet(e.target.value)} />
+            <Field label="Нетно (т)" required hint="чисто количество след отбив">
+              <input className="input" type="number" step="0.001" value={net} onChange={(e) => setNet(e.target.value)} />
             </Field>
-            <Field label="Отбив">
-              <input className="input" type="number" step="0.01" value={ded} onChange={(e) => setDed(e.target.value)} />
+            <Field label="Отбив" hint="само за статистика">
+              <input className="input" type="number" step="0.001" value={ded} onChange={(e) => setDed(e.target.value)} />
             </Field>
             <Field label="Отбив в">
               <select className="input" value={dedMode} onChange={(e) => setDedMode(e.target.value as any)}>
-                <option value="kg">кг</option>
+                <option value="kg">т</option>
                 <option value="pct">%</option>
               </select>
             </Field>
-            <Field label="Цена (лв/кг)" required>
-              <input className="input" type="number" step="0.0001" value={price} onChange={(e) => setPrice(e.target.value)} />
+            <Field label="Цена (€/т)" required>
+              <input className="input" type="number" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} />
             </Field>
           </FormGrid>
 
           <div className="grid grid-cols-3 gap-4 rounded-lg bg-slate-50 p-3 text-sm">
             <div>
-              <span className="text-slate-500">Заприходено: </span>
-              <span className="font-semibold">{fmtKg(accounted)}</span>
+              <span className="text-slate-500">Нето (в наличност): </span>
+              <span className="font-semibold">{fmtKg(netN)}</span>
             </div>
             <div>
               <span className="text-slate-500">Отбив: </span>
-              <span className="font-semibold">{fmtKg(dedKg)}</span>
+              <span className="font-semibold">{fmtKg(dedTons)} ({fmtPct(dedPct)})</span>
             </div>
             <div>
               <span className="text-slate-500">Стойност: </span>
@@ -286,7 +296,7 @@ export default function DeliveriesPage() {
               <div>Материал</div>
               <div>Вид</div>
               <div>Стойност</div>
-              <div className="text-right">= кг</div>
+              <div className="text-right">= т</div>
               <div></div>
             </div>
             <div className="space-y-2">
@@ -312,12 +322,12 @@ export default function DeliveriesPage() {
                     }}
                   >
                     <option value="pct">%</option>
-                    <option value="kg">кг</option>
+                    <option value="kg">т</option>
                   </select>
                   <input
                     className="input"
                     type="number"
-                    step="0.01"
+                    step="0.001"
                     value={a.amount}
                     onChange={(e) => {
                       const c = [...allocs];
