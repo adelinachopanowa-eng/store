@@ -2,20 +2,31 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { GroupBalance, Supplier } from "@/lib/types";
+import { MaterialBalance, Supplier } from "@/lib/types";
 import { fmtKg, fmtLv, fmtPrice, fmtDate } from "@/lib/format";
-import { PageHeader, Loading, Empty, Modal, VoidButton, VoidedBadge } from "@/components/ui";
+import {
+  PageHeader,
+  Loading,
+  Empty,
+  Modal,
+  Field,
+  FormGrid,
+  FormActions,
+  FormError,
+  VoidButton,
+  VoidedBadge,
+} from "@/components/ui";
+import Combobox, { ComboValue } from "@/components/Combobox";
 
 export default function SalesPage() {
   const [list, setList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
-  const [groups, setGroups] = useState<GroupBalance[]>([]);
+  const [materials, setMaterials] = useState<MaterialBalance[]>([]);
   const [customers, setCustomers] = useState<Supplier[]>([]);
 
-  const [groupId, setGroupId] = useState("");
-  const [buyerId, setBuyerId] = useState("");
-  const [buyerName, setBuyerName] = useState("");
+  const [materialId, setMaterialId] = useState("");
+  const [buyer, setBuyer] = useState<ComboValue>({ id: null, name: "" });
   const [qty, setQty] = useState("");
   const [price, setPrice] = useState("");
   const [pay, setPay] = useState<"cash" | "bank">("bank");
@@ -26,18 +37,18 @@ export default function SalesPage() {
   const [saving, setSaving] = useState(false);
 
   async function loadRefs() {
-    const [g, c] = await Promise.all([
-      supabase.from("wh_group_balances").select("*").eq("active", true).order("group_name"),
+    const [m, c] = await Promise.all([
+      supabase.from("wh_material_balances").select("*").order("material_name"),
       supabase.from("wh_suppliers").select("*").eq("active", true).order("name"),
     ]);
-    setGroups((g.data as GroupBalance[]) || []);
+    setMaterials((m.data as MaterialBalance[]) || []);
     setCustomers((c.data as Supplier[]) || []);
   }
   async function loadList() {
     setLoading(true);
     const { data } = await supabase
       .from("wh_sales")
-      .select("*, wh_groups(name), wh_suppliers(name)")
+      .select("*, wh_materials(name), wh_suppliers(name)")
       .order("doc_date", { ascending: false })
       .limit(100);
     setList(data || []);
@@ -48,7 +59,7 @@ export default function SalesPage() {
     loadList();
   }, []);
 
-  const sel = groups.find((g) => g.group_id === groupId);
+  const sel = materials.find((m) => m.material_id === materialId);
   const qtyN = Number(qty) || 0;
   const priceN = Number(price) || 0;
   const cost = sel ? qtyN * Number(sel.avg_price) : 0;
@@ -56,9 +67,8 @@ export default function SalesPage() {
   const profit = revenue - cost;
 
   function reset() {
-    setGroupId("");
-    setBuyerId("");
-    setBuyerName("");
+    setMaterialId("");
+    setBuyer({ id: null, name: "" });
     setQty("");
     setPrice("");
     setPay("bank");
@@ -70,15 +80,14 @@ export default function SalesPage() {
 
   async function save() {
     setErr("");
-    if (!groupId) return setErr("Изберете група.");
+    if (!materialId) return setErr("Изберете материал.");
     if (qtyN <= 0) return setErr("Въведете количество.");
-    if (sel && qtyN > Number(sel.quantity_kg) + 0.001)
-      return setErr(`Недостатъчна наличност (${fmtKg(sel.quantity_kg)}).`);
+    if (sel && qtyN > Number(sel.quantity_kg) + 0.001) return setErr(`Недостатъчна наличност (${fmtKg(sel.quantity_kg)}).`);
     setSaving(true);
     const { error } = await supabase.rpc("wh_record_sale", {
-      p_group_id: groupId,
-      p_supplier_id: buyerId || null,
-      p_buyer_name: buyerId ? null : buyerName || null,
+      p_material_id: materialId,
+      p_supplier_id: buyer.id,
+      p_buyer_name: buyer.id ? null : buyer.name || null,
       p_quantity_kg: qtyN,
       p_unit_price: priceN || null,
       p_payment_method: pay,
@@ -125,7 +134,7 @@ export default function SalesPage() {
               <tr>
                 <th className="th">Дата</th>
                 <th className="th">№</th>
-                <th className="th">Група</th>
+                <th className="th">Материал</th>
                 <th className="th">Купувач</th>
                 <th className="th text-right">Кол-во</th>
                 <th className="th text-right">Себест.</th>
@@ -140,7 +149,7 @@ export default function SalesPage() {
                 <tr key={s.id} className={`hover:bg-slate-50 ${s.voided ? "opacity-50" : ""}`}>
                   <td className="td whitespace-nowrap">{fmtDate(s.doc_date)}</td>
                   <td className="td">{s.doc_number || "—"}</td>
-                  <td className="td">{s.wh_groups?.name || "—"}</td>
+                  <td className="td">{s.wh_materials?.name || "—"}</td>
                   <td className="td">{s.wh_suppliers?.name || s.buyer_name || "—"}</td>
                   <td className="td text-right">{fmtKg(s.quantity_kg)}</td>
                   <td className="td text-right">{fmtPrice(s.avg_cost)}</td>
@@ -176,60 +185,43 @@ export default function SalesPage() {
         </div>
       )}
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Нова продажба / експедиция">
+      <Modal open={open} onClose={() => setOpen(false)} title="Нова продажба / експедиция" wide>
         <div className="space-y-4">
-          <div>
-            <label className="label">Група *</label>
-            <select className="input" value={groupId} onChange={(e) => setGroupId(e.target.value)}>
-              <option value="">— изберете —</option>
-              {groups.map((g) => (
-                <option key={g.group_id} value={g.group_id}>
-                  {g.group_name} · налично {fmtKg(g.quantity_kg)} · ср.цена {fmtPrice(g.avg_price)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Купувач (от база)</label>
-              <select
-                className="input"
-                value={buyerId}
-                onChange={(e) => {
-                  setBuyerId(e.target.value);
-                  if (e.target.value) setBuyerName("");
-                }}
-              >
-                <option value="">— ad-hoc —</option>
-                {customers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
+          <FormGrid cols={2}>
+            <Field label="Материал" required>
+              <select className="input" value={materialId} onChange={(e) => setMaterialId(e.target.value)}>
+                <option value="">— изберете —</option>
+                {materials.map((m) => (
+                  <option key={m.material_id} value={m.material_id}>
+                    {m.material_name} · {fmtKg(m.quantity_kg)} · {fmtPrice(m.avg_price)}
                   </option>
                 ))}
               </select>
-            </div>
-            <div>
-              <label className="label">или ръчно</label>
-              <input className="input" value={buyerName} disabled={!!buyerId} onChange={(e) => setBuyerName(e.target.value)} />
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="label">Количество (кг) *</label>
+            </Field>
+            <Field label="Купувач" hint="изберете от базата или въведете нов">
+              <Combobox
+                items={customers.map((c) => ({ id: c.id, name: c.name }))}
+                value={buyer}
+                onChange={setBuyer}
+                placeholder="Име на купувач"
+              />
+            </Field>
+          </FormGrid>
+
+          <FormGrid cols={3}>
+            <Field label="Количество (кг)" required>
               <input className="input" type="number" step="0.01" value={qty} onChange={(e) => setQty(e.target.value)} />
-            </div>
-            <div>
-              <label className="label">Продажна цена (лв/кг)</label>
+            </Field>
+            <Field label="Продажна цена (лв/кг)">
               <input className="input" type="number" step="0.0001" value={price} onChange={(e) => setPrice(e.target.value)} />
-            </div>
-            <div>
-              <label className="label">Документ №</label>
+            </Field>
+            <Field label="Документ №">
               <input className="input" value={docNumber} onChange={(e) => setDocNumber(e.target.value)} />
-            </div>
-          </div>
+            </Field>
+          </FormGrid>
 
           {sel && (
-            <div className="grid grid-cols-3 gap-3 rounded-lg bg-slate-50 p-3 text-sm">
+            <div className="grid grid-cols-3 gap-4 rounded-lg bg-slate-50 p-3 text-sm">
               <div>
                 <span className="text-slate-500">Себестойност: </span>
                 <span className="font-semibold">{fmtLv(cost)}</span>
@@ -245,35 +237,34 @@ export default function SalesPage() {
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3 items-end">
-            <div>
-              <label className="label">Начин на плащане</label>
+          <FormGrid cols={2}>
+            <Field label="Начин на плащане">
               <select className="input" value={pay} onChange={(e) => setPay(e.target.value as any)}>
                 <option value="bank">По банка</option>
                 <option value="cash">В брой</option>
               </select>
-            </div>
-            <div className="flex items-center gap-2 pb-2">
-              <input id="paidS" type="checkbox" checked={paid} onChange={(e) => setPaid(e.target.checked)} className="h-4 w-4" />
-              <label htmlFor="paidS" className="text-sm text-slate-700">
-                Платено
+            </Field>
+            <Field label="Статус">
+              <label className="input flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={paid} onChange={(e) => setPaid(e.target.checked)} className="h-4 w-4" />
+                <span className="text-sm text-slate-700">Платено</span>
               </label>
-            </div>
-          </div>
-          <div>
-            <label className="label">Бележка</label>
-            <input className="input" value={note} onChange={(e) => setNote(e.target.value)} />
-          </div>
+            </Field>
+          </FormGrid>
 
-          {err && <p className="text-sm text-red-600">{err}</p>}
-          <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
+          <Field label="Бележка">
+            <input className="input" value={note} onChange={(e) => setNote(e.target.value)} />
+          </Field>
+
+          <FormError msg={err} />
+          <FormActions>
             <button className="btn-secondary" onClick={() => setOpen(false)}>
               Отказ
             </button>
             <button className="btn-primary" onClick={save} disabled={saving}>
               {saving ? "Запис…" : "Запиши продажба"}
             </button>
-          </div>
+          </FormActions>
         </div>
       </Modal>
     </div>

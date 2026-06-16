@@ -61,6 +61,46 @@ export function Loading() {
   return <div className="p-10 text-center text-slate-400 text-sm">Зареждане…</div>;
 }
 
+// ---- Единна система за форми (равномерно подравняване) ----
+
+export function Field({
+  label,
+  required,
+  hint,
+  children,
+  className = "",
+}: {
+  label: string;
+  required?: boolean;
+  hint?: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`flex flex-col ${className}`}>
+      <label className="label">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      {children}
+      {hint && <span className="mt-1 text-xs text-slate-400">{hint}</span>}
+    </div>
+  );
+}
+
+export function FormGrid({ children, cols = 2 }: { children: ReactNode; cols?: 1 | 2 | 3 | 4 }) {
+  const map = { 1: "grid-cols-1", 2: "grid-cols-2", 3: "grid-cols-3", 4: "grid-cols-4" };
+  return <div className={`grid ${map[cols]} gap-x-4 gap-y-4`}>{children}</div>;
+}
+
+export function FormActions({ children }: { children: ReactNode }) {
+  return <div className="flex justify-end gap-2 pt-4 mt-2 border-t border-slate-200">{children}</div>;
+}
+
+export function FormError({ msg }: { msg: string }) {
+  if (!msg) return null;
+  return <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 border border-red-200">{msg}</div>;
+}
+
 export function VoidedBadge() {
   return <span className="badge bg-slate-200 text-slate-500 line-through">Анулиран</span>;
 }

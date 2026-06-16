@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { GroupBalance } from "@/lib/types";
+import { MaterialBalance } from "@/lib/types";
 import { fmtKg, fmtLv, fmtPrice, fmtPct, fmtDate } from "@/lib/format";
 import { PageHeader, Loading, Stat } from "@/components/ui";
 
@@ -41,12 +41,12 @@ export default function ReportsPage() {
     const fromTs = new Date(from + "T00:00:00").toISOString();
     const toTs = new Date(to + "T23:59:59").toISOString();
     if (report === "stock") {
-      const { data: d } = await supabase.from("wh_group_balances").select("*").order("group_name");
+      const { data: d } = await supabase.from("wh_material_balances").select("*").order("material_name");
       setData(d || []);
     } else if (report === "deliveries") {
       const { data: d } = await supabase
         .from("wh_deliveries")
-        .select("*, wh_suppliers(name), wh_materials(name)")
+        .select("*, wh_suppliers(name)")
         .gte("doc_date", fromTs)
         .lte("doc_date", toTs)
         .order("doc_date", { ascending: false });
@@ -54,7 +54,7 @@ export default function ReportsPage() {
     } else if (report === "sales") {
       const { data: d } = await supabase
         .from("wh_sales")
-        .select("*, wh_groups(name), wh_suppliers(name)")
+        .select("*, wh_materials(name), wh_suppliers(name)")
         .gte("doc_date", fromTs)
         .lte("doc_date", toTs)
         .order("doc_date", { ascending: false });
@@ -80,8 +80,7 @@ export default function ReportsPage() {
   function exportCSV() {
     let rows: any[] = [];
     if (report === "stock")
-      rows = (data as GroupBalance[]).map((r) => ({
-        Група: r.group_name,
+      rows = (data as MaterialBalance[]).map((r) => ({
         Материал: r.material_name,
         "Наличност кг": Number(r.quantity_kg).toFixed(2),
         "Средна цена": Number(r.avg_price).toFixed(4),
@@ -93,7 +92,6 @@ export default function ReportsPage() {
         Дата: fmtDate(d.doc_date),
         Документ: d.doc_number,
         Доставчик: d.wh_suppliers?.name || d.supplier_name,
-        Материал: d.wh_materials?.name,
         "Нето кг": d.net_quantity,
         "Отбив кг": d.deduction_kg,
         "Заприходено кг": d.accounted_quantity,
@@ -106,7 +104,7 @@ export default function ReportsPage() {
       rows = data.map((s) => ({
         Дата: fmtDate(s.doc_date),
         Документ: s.doc_number,
-        Група: s.wh_groups?.name,
+        Материал: s.wh_materials?.name,
         Купувач: s.wh_suppliers?.name || s.buyer_name,
         "Кол-во кг": s.quantity_kg,
         "Себестойност": s.avg_cost,
@@ -181,11 +179,12 @@ function ReportTable({ report, data }: { report: Report; data: any[] }) {
         <div className="grid grid-cols-3 gap-4 mb-4">
           <Stat label="Общо наличност" value={fmtKg(totQty)} color="blue" />
           <Stat label="Складова стойност" value={fmtLv(totVal)} color="green" />
-          <Stat label="Групи" value={String(data.length)} />
+          <Stat label="Материали" value={String(data.length)} />
         </div>
         <Table
-          head={["Група", "Материал", "Наличност", "Средна цена", "Стойност", "Ср. отбив"]}
-          rows={data.map((r) => [r.group_name, r.material_name || "—", fmtKg(r.quantity_kg), fmtPrice(r.avg_price), fmtLv(r.total_value), fmtPct(r.avg_deduction_pct)])}
+          rightFrom={1}
+          head={["Материал", "Наличност", "Средна цена", "Стойност", "Ср. отбив"]}
+          rows={data.map((r) => [r.material_name, fmtKg(r.quantity_kg), fmtPrice(r.avg_price), fmtLv(r.total_value), fmtPct(r.avg_deduction_pct)])}
         />
       </>
     );
@@ -201,11 +200,11 @@ function ReportTable({ report, data }: { report: Report; data: any[] }) {
           <Stat label="Обща стойност" value={fmtLv(tot)} color="green" />
         </div>
         <Table
-          head={["Дата", "Доставчик", "Материал", "Заприх.", "Цена", "Стойност", "Плащане"]}
+          rightFrom={2}
+          head={["Дата", "Доставчик", "Заприх.", "Цена", "Стойност", "Плащане"]}
           rows={data.map((d) => [
             fmtDate(d.doc_date),
             d.wh_suppliers?.name || d.supplier_name || "—",
-            d.wh_materials?.name || "—",
             fmtKg(d.accounted_quantity),
             fmtPrice(d.unit_price),
             fmtLv(d.total_value),
@@ -227,10 +226,11 @@ function ReportTable({ report, data }: { report: Report; data: any[] }) {
           <Stat label="Печалба" value={fmtLv(rev - cost)} color={rev - cost >= 0 ? "green" : "red"} />
         </div>
         <Table
-          head={["Дата", "Група", "Купувач", "Кол-во", "Себест.", "Приход", "Печалба"]}
+          rightFrom={3}
+          head={["Дата", "Материал", "Купувач", "Кол-во", "Себест.", "Приход", "Печалба"]}
           rows={data.map((s) => [
             fmtDate(s.doc_date),
-            s.wh_groups?.name || "—",
+            s.wh_materials?.name || "—",
             s.wh_suppliers?.name || s.buyer_name || "—",
             fmtKg(s.quantity_kg),
             fmtLv(s.cost_value),
@@ -250,6 +250,7 @@ function ReportTable({ report, data }: { report: Report; data: any[] }) {
         <Stat label="Обща сума" value={fmtLv(tot)} color="red" />
       </div>
       <Table
+        rightFrom={3}
         head={["Тип", "Дата", "Контрагент", "Сума", "Плащане"]}
         rows={data.map((x) => [
           x._kind,
@@ -263,7 +264,15 @@ function ReportTable({ report, data }: { report: Report; data: any[] }) {
   );
 }
 
-function Table({ head, rows }: { head: string[]; rows: (string | number)[][] }) {
+function Table({
+  head,
+  rows,
+  rightFrom = 3,
+}: {
+  head: string[];
+  rows: (string | number)[][];
+  rightFrom?: number;
+}) {
   if (!rows.length) return <div className="card p-10 text-center text-slate-400 text-sm">Няма данни.</div>;
   return (
     <div className="card overflow-hidden">
@@ -271,7 +280,7 @@ function Table({ head, rows }: { head: string[]; rows: (string | number)[][] }) 
         <thead className="bg-slate-50">
           <tr>
             {head.map((h, i) => (
-              <th key={i} className={`th ${i >= 3 ? "text-right" : ""}`}>
+              <th key={i} className={`th ${i >= rightFrom ? "text-right" : ""}`}>
                 {h}
               </th>
             ))}
@@ -281,7 +290,7 @@ function Table({ head, rows }: { head: string[]; rows: (string | number)[][] }) 
           {rows.map((r, i) => (
             <tr key={i} className="hover:bg-slate-50">
               {r.map((c, j) => (
-                <td key={j} className={`td ${j >= 3 ? "text-right" : ""}`}>
+                <td key={j} className={`td ${j >= rightFrom ? "text-right" : ""}`}>
                   {c}
                 </td>
               ))}

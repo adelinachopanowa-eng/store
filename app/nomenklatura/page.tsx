@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Material, Supplier } from "@/lib/types";
 import { fmtPrice } from "@/lib/format";
-import { PageHeader, Loading, Empty, Modal } from "@/components/ui";
+import { PageHeader, Loading, Empty, Modal, Field, FormGrid, FormActions, FormError } from "@/components/ui";
 
 type Tab = "materials" | "suppliers";
 
@@ -112,37 +112,32 @@ function Materials() {
 
       <Modal open={open} onClose={() => setOpen(false)} title="Нов материал">
         <div className="space-y-4">
-          <div>
-            <label className="label">Наименование *</label>
+          <Field label="Наименование" required>
             <input className="input" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Код</label>
+          </Field>
+          <FormGrid cols={2}>
+            <Field label="Код">
               <input className="input" value={f.code} onChange={(e) => setF({ ...f, code: e.target.value })} />
-            </div>
-            <div>
-              <label className="label">Код отпадък</label>
+            </Field>
+            <Field label="Код отпадък">
               <input className="input" value={f.waste_code} onChange={(e) => setF({ ...f, waste_code: e.target.value })} />
-            </div>
-            <div>
-              <label className="label">Мярка</label>
+            </Field>
+            <Field label="Мярка">
               <input className="input" value={f.unit} onChange={(e) => setF({ ...f, unit: e.target.value })} />
-            </div>
-            <div>
-              <label className="label">Ориент. цена (лв/кг)</label>
+            </Field>
+            <Field label="Ориент. цена (лв/кг)">
               <input className="input" type="number" step="0.0001" value={f.default_price} onChange={(e) => setF({ ...f, default_price: e.target.value })} />
-            </div>
-          </div>
-          {err && <p className="text-sm text-red-600">{err}</p>}
-          <div className="flex justify-end gap-2">
+            </Field>
+          </FormGrid>
+          <FormError msg={err} />
+          <FormActions>
             <button className="btn-secondary" onClick={() => setOpen(false)}>
               Отказ
             </button>
             <button className="btn-primary" onClick={save} disabled={saving}>
               {saving ? "Запис…" : "Запази"}
             </button>
-          </div>
+          </FormActions>
         </div>
       </Modal>
     </div>
@@ -233,45 +228,39 @@ function Suppliers() {
 
       <Modal open={open} onClose={() => setOpen(false)} title="Нов контрагент">
         <div className="space-y-4">
-          <div>
-            <label className="label">Име *</label>
-            <input className="input" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
-          </div>
-          <div>
-            <label className="label">Тип</label>
-            <select className="input" value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value })}>
-              <option value="supplier">Доставчик</option>
-              <option value="customer">Клиент</option>
-              <option value="both">Доставчик/Клиент</option>
-            </select>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">ЕИК</label>
+          <FormGrid cols={2}>
+            <Field label="Име" required>
+              <input className="input" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
+            </Field>
+            <Field label="Тип">
+              <select className="input" value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value })}>
+                <option value="supplier">Доставчик</option>
+                <option value="customer">Клиент</option>
+                <option value="both">Доставчик/Клиент</option>
+              </select>
+            </Field>
+            <Field label="ЕИК">
               <input className="input" value={f.eik} onChange={(e) => setF({ ...f, eik: e.target.value })} />
-            </div>
-            <div>
-              <label className="label">ЕГН</label>
+            </Field>
+            <Field label="ЕГН">
               <input className="input" value={f.egn} onChange={(e) => setF({ ...f, egn: e.target.value })} />
-            </div>
-            <div>
-              <label className="label">Град</label>
+            </Field>
+            <Field label="Град">
               <input className="input" value={f.city} onChange={(e) => setF({ ...f, city: e.target.value })} />
-            </div>
-            <div>
-              <label className="label">Телефон</label>
+            </Field>
+            <Field label="Телефон">
               <input className="input" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} />
-            </div>
-          </div>
-          {err && <p className="text-sm text-red-600">{err}</p>}
-          <div className="flex justify-end gap-2">
+            </Field>
+          </FormGrid>
+          <FormError msg={err} />
+          <FormActions>
             <button className="btn-secondary" onClick={() => setOpen(false)}>
               Отказ
             </button>
             <button className="btn-primary" onClick={save} disabled={saving}>
               {saving ? "Запис…" : "Запази"}
             </button>
-          </div>
+          </FormActions>
         </div>
       </Modal>
     </div>

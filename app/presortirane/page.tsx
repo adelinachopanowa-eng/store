@@ -2,15 +2,26 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { GroupBalance } from "@/lib/types";
+import { MaterialBalance } from "@/lib/types";
 import { fmtKg, fmtLv, fmtPrice, fmtDate } from "@/lib/format";
-import { PageHeader, Loading, Empty, Modal, VoidButton, VoidedBadge } from "@/components/ui";
+import {
+  PageHeader,
+  Loading,
+  Empty,
+  Modal,
+  Field,
+  FormGrid,
+  FormActions,
+  FormError,
+  VoidButton,
+  VoidedBadge,
+} from "@/components/ui";
 
 export default function TransfersPage() {
   const [list, setList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
-  const [groups, setGroups] = useState<GroupBalance[]>([]);
+  const [materials, setMaterials] = useState<MaterialBalance[]>([]);
 
   const [fromId, setFromId] = useState("");
   const [toId, setToId] = useState("");
@@ -20,14 +31,14 @@ export default function TransfersPage() {
   const [saving, setSaving] = useState(false);
 
   async function loadRefs() {
-    const { data } = await supabase.from("wh_group_balances").select("*").eq("active", true).order("group_name");
-    setGroups((data as GroupBalance[]) || []);
+    const { data } = await supabase.from("wh_material_balances").select("*").order("material_name");
+    setMaterials((data as MaterialBalance[]) || []);
   }
   async function loadList() {
     setLoading(true);
     const { data } = await supabase
       .from("wh_transfers")
-      .select("*, from_group:from_group_id(name), to_group:to_group_id(name)")
+      .select("*, from_mat:from_material_id(name), to_mat:to_material_id(name)")
       .order("doc_date", { ascending: false })
       .limit(100);
     setList(data || []);
@@ -38,7 +49,7 @@ export default function TransfersPage() {
     loadList();
   }, []);
 
-  const from = groups.find((g) => g.group_id === fromId);
+  const from = materials.find((m) => m.material_id === fromId);
   const qtyN = Number(qty) || 0;
   const moveVal = from ? qtyN * Number(from.avg_price) : 0;
 
@@ -53,13 +64,13 @@ export default function TransfersPage() {
   async function save() {
     setErr("");
     if (!fromId || !toId) return setErr("Изберете източник и цел.");
-    if (fromId === toId) return setErr("Групите трябва да са различни.");
+    if (fromId === toId) return setErr("Материалите трябва да са различни.");
     if (qtyN <= 0) return setErr("Въведете количество.");
     if (from && qtyN > Number(from.quantity_kg) + 0.001) return setErr(`Недостатъчна наличност (${fmtKg(from.quantity_kg)}).`);
     setSaving(true);
     const { error } = await supabase.rpc("wh_record_transfer", {
-      p_from_group_id: fromId,
-      p_to_group_id: toId,
+      p_from_material_id: fromId,
+      p_to_material_id: toId,
       p_quantity_kg: qtyN,
       p_doc_date: new Date().toISOString(),
       p_note: note || null,
@@ -77,7 +88,7 @@ export default function TransfersPage() {
     <div>
       <PageHeader
         title="Пресортиране"
-        subtitle="Прехвърляне между групи с коректно преизчисляване на средната цена"
+        subtitle="Прехвърляне между материали с коректно преизчисляване на средната цена"
         actions={
           <button
             className="btn-primary"
@@ -101,8 +112,8 @@ export default function TransfersPage() {
             <thead className="bg-slate-50">
               <tr>
                 <th className="th">Дата</th>
-                <th className="th">От група</th>
-                <th className="th">Към група</th>
+                <th className="th">От материал</th>
+                <th className="th">Към материал</th>
                 <th className="th text-right">Кол-во</th>
                 <th className="th text-right">Ср. цена</th>
                 <th className="th text-right">Стойност</th>
@@ -114,8 +125,8 @@ export default function TransfersPage() {
               {list.map((t) => (
                 <tr key={t.id} className={`hover:bg-slate-50 ${t.voided ? "opacity-50" : ""}`}>
                   <td className="td whitespace-nowrap">{fmtDate(t.doc_date)}</td>
-                  <td className="td">{t.from_group?.name || "—"}</td>
-                  <td className="td">{t.to_group?.name || "—"}</td>
+                  <td className="td">{t.from_mat?.name || "—"}</td>
+                  <td className="td">{t.to_mat?.name || "—"}</td>
                   <td className="td text-right">{fmtKg(t.quantity_kg)}</td>
                   <td className="td text-right">{fmtPrice(t.avg_cost)}</td>
                   <td className="td text-right">{fmtLv(t.value)}</td>
@@ -145,54 +156,55 @@ export default function TransfersPage() {
         </div>
       )}
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Пресортиране между групи">
+      <Modal open={open} onClose={() => setOpen(false)} title="Пресортиране между материали">
         <div className="space-y-4">
-          <div>
-            <label className="label">От група *</label>
-            <select className="input" value={fromId} onChange={(e) => setFromId(e.target.value)}>
-              <option value="">— изберете —</option>
-              {groups.map((g) => (
-                <option key={g.group_id} value={g.group_id}>
-                  {g.group_name} · налично {fmtKg(g.quantity_kg)} · {fmtPrice(g.avg_price)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="label">Към група *</label>
-            <select className="input" value={toId} onChange={(e) => setToId(e.target.value)}>
-              <option value="">— изберете —</option>
-              {groups
-                .filter((g) => g.group_id !== fromId)
-                .map((g) => (
-                  <option key={g.group_id} value={g.group_id}>
-                    {g.group_name} · налично {fmtKg(g.quantity_kg)} · {fmtPrice(g.avg_price)}
+          <FormGrid cols={1}>
+            <Field label="От материал" required>
+              <select className="input" value={fromId} onChange={(e) => setFromId(e.target.value)}>
+                <option value="">— изберете —</option>
+                {materials.map((m) => (
+                  <option key={m.material_id} value={m.material_id}>
+                    {m.material_name} · {fmtKg(m.quantity_kg)} · {fmtPrice(m.avg_price)}
                   </option>
                 ))}
-            </select>
-          </div>
-          <div>
-            <label className="label">Количество (кг) *</label>
-            <input className="input" type="number" step="0.01" value={qty} onChange={(e) => setQty(e.target.value)} />
-          </div>
+              </select>
+            </Field>
+            <Field label="Към материал" required>
+              <select className="input" value={toId} onChange={(e) => setToId(e.target.value)}>
+                <option value="">— изберете —</option>
+                {materials
+                  .filter((m) => m.material_id !== fromId)
+                  .map((m) => (
+                    <option key={m.material_id} value={m.material_id}>
+                      {m.material_name} · {fmtKg(m.quantity_kg)} · {fmtPrice(m.avg_price)}
+                    </option>
+                  ))}
+              </select>
+            </Field>
+            <Field label="Количество (кг)" required>
+              <input className="input" type="number" step="0.01" value={qty} onChange={(e) => setQty(e.target.value)} />
+            </Field>
+          </FormGrid>
+
           {from && (
             <div className="rounded-lg bg-slate-50 p-3 text-sm">
               Прехвърля се по средна цена <b>{fmtPrice(from.avg_price)}</b> на стойност <b>{fmtLv(moveVal)}</b>.
             </div>
           )}
-          <div>
-            <label className="label">Бележка</label>
+
+          <Field label="Бележка">
             <input className="input" value={note} onChange={(e) => setNote(e.target.value)} />
-          </div>
-          {err && <p className="text-sm text-red-600">{err}</p>}
-          <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
+          </Field>
+
+          <FormError msg={err} />
+          <FormActions>
             <button className="btn-secondary" onClick={() => setOpen(false)}>
               Отказ
             </button>
             <button className="btn-primary" onClick={save} disabled={saving}>
               {saving ? "Запис…" : "Прехвърли"}
             </button>
-          </div>
+          </FormActions>
         </div>
       </Modal>
     </div>

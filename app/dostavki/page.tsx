@@ -2,11 +2,25 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { GroupBalance, Material, Supplier } from "@/lib/types";
+import { MaterialBalance, Supplier } from "@/lib/types";
 import { fmtKg, fmtLv, fmtPrice, fmtDate } from "@/lib/format";
-import { PageHeader, Loading, Empty, Modal, VoidButton, VoidedBadge } from "@/components/ui";
+import {
+  PageHeader,
+  Loading,
+  Empty,
+  Modal,
+  Field,
+  FormGrid,
+  FormActions,
+  FormError,
+  VoidButton,
+  VoidedBadge,
+} from "@/components/ui";
+import Combobox, { ComboValue } from "@/components/Combobox";
 
-type Alloc = { group_id: string; mode: "pct" | "kg"; amount: string };
+type Alloc = { mat: ComboValue; mode: "pct" | "kg"; amount: string };
+
+const emptyMat: ComboValue = { id: null, name: "" };
 
 export default function DeliveriesPage() {
   const [list, setList] = useState<any[]>([]);
@@ -14,13 +28,10 @@ export default function DeliveriesPage() {
   const [open, setOpen] = useState(false);
 
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [materials, setMaterials] = useState<Material[]>([]);
-  const [groups, setGroups] = useState<GroupBalance[]>([]);
+  const [materials, setMaterials] = useState<MaterialBalance[]>([]);
 
-  // form
-  const [supplierId, setSupplierId] = useState("");
-  const [supplierName, setSupplierName] = useState("");
-  const [materialId, setMaterialId] = useState("");
+  // форма
+  const [supplier, setSupplier] = useState<ComboValue>({ id: null, name: "" });
   const [net, setNet] = useState("");
   const [dedMode, setDedMode] = useState<"kg" | "pct">("kg");
   const [ded, setDed] = useState("");
@@ -29,32 +40,28 @@ export default function DeliveriesPage() {
   const [paid, setPaid] = useState(false);
   const [docNumber, setDocNumber] = useState("");
   const [note, setNote] = useState("");
-  const [allocs, setAllocs] = useState<Alloc[]>([{ group_id: "", mode: "pct", amount: "100" }]);
+  const [allocs, setAllocs] = useState<Alloc[]>([{ mat: { ...emptyMat }, mode: "pct", amount: "100" }]);
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);
 
   async function loadRefs() {
-    const [s, m, g] = await Promise.all([
+    const [s, m] = await Promise.all([
       supabase.from("wh_suppliers").select("*").eq("active", true).order("name"),
-      supabase.from("wh_materials").select("*").eq("active", true).order("name"),
-      supabase.from("wh_group_balances").select("*").eq("active", true).order("group_name"),
+      supabase.from("wh_material_balances").select("*").order("material_name"),
     ]);
     setSuppliers((s.data as Supplier[]) || []);
-    setMaterials((m.data as Material[]) || []);
-    setGroups((g.data as GroupBalance[]) || []);
+    setMaterials((m.data as MaterialBalance[]) || []);
   }
-
   async function loadList() {
     setLoading(true);
     const { data } = await supabase
       .from("wh_deliveries")
-      .select("*, wh_suppliers(name), wh_materials(name)")
+      .select("*, wh_suppliers(name)")
       .order("doc_date", { ascending: false })
       .limit(100);
     setList(data || []);
     setLoading(false);
   }
-
   useEffect(() => {
     loadRefs();
     loadList();
@@ -66,21 +73,15 @@ export default function DeliveriesPage() {
   const priceN = Number(price) || 0;
   const total = accounted * priceN;
 
-  // изчислени кг по групи
   const allocKg = useMemo(
-    () =>
-      allocs.map((a) =>
-        a.mode === "pct" ? (accounted * (Number(a.amount) || 0)) / 100 : Number(a.amount) || 0
-      ),
+    () => allocs.map((a) => (a.mode === "pct" ? (accounted * (Number(a.amount) || 0)) / 100 : Number(a.amount) || 0)),
     [allocs, accounted]
   );
   const sumAlloc = allocKg.reduce((s, n) => s + n, 0);
   const allocOk = Math.abs(sumAlloc - accounted) < 0.01 && accounted > 0;
 
   function resetForm() {
-    setSupplierId("");
-    setSupplierName("");
-    setMaterialId("");
+    setSupplier({ id: null, name: "" });
     setNet("");
     setDed("");
     setDedMode("kg");
@@ -89,7 +90,7 @@ export default function DeliveriesPage() {
     setPaid(false);
     setDocNumber("");
     setNote("");
-    setAllocs([{ group_id: "", mode: "pct", amount: "100" }]);
+    setAllocs([{ mat: { ...emptyMat }, mode: "pct", amount: "100" }]);
     setErr("");
   }
 
@@ -97,42 +98,54 @@ export default function DeliveriesPage() {
     setErr("");
     if (accounted <= 0) return setErr("Въведете нетно количество и отбив.");
     if (priceN <= 0) return setErr("Въведете изкупна цена.");
-    if (allocs.some((a) => !a.group_id)) return setErr("Изберете група за всеки ред на разпределение.");
+    if (allocs.some((a) => !a.mat.name.trim())) return setErr("Изберете или въведете материал за всеки ред.");
     if (!allocOk)
-      return setErr(
-        `Сборът на групите (${sumAlloc.toFixed(2)} кг) трябва да е равен на заприходеното (${accounted.toFixed(2)} кг).`
-      );
+      return setErr(`Сборът на материалите (${sumAlloc.toFixed(2)} кг) трябва да е равен на заприходеното (${accounted.toFixed(2)} кг).`);
 
     setSaving(true);
-    const payload = {
-      p_supplier_id: supplierId || null,
-      p_supplier_name: supplierId ? null : supplierName || null,
-      p_material_id: materialId || null,
-      p_net_quantity: netN,
-      p_deduction_kg: dedKg,
-      p_unit_price: priceN,
-      p_payment_method: pay,
-      p_paid: paid,
-      p_doc_number: docNumber || null,
-      p_doc_date: new Date().toISOString(),
-      p_note: note || null,
-      p_operator_name: null,
-      p_allocations: allocs.map((a, i) => ({ group_id: a.group_id, quantity_kg: allocKg[i] })),
-    };
-    const { error } = await supabase.rpc("wh_record_delivery", payload);
-    setSaving(false);
-    if (error) return setErr(error.message);
-    resetForm();
-    setOpen(false);
-    loadList();
-    loadRefs();
+    try {
+      // резолюция на материали (ново име -> запис в базата)
+      const ids: string[] = [];
+      for (const a of allocs) {
+        if (a.mat.id) {
+          ids.push(a.mat.id);
+        } else {
+          const { data, error } = await supabase.rpc("wh_get_or_create_material", { p_name: a.mat.name.trim() });
+          if (error) throw new Error(error.message);
+          ids.push(data as string);
+        }
+      }
+      const { error } = await supabase.rpc("wh_record_delivery", {
+        p_supplier_id: supplier.id,
+        p_supplier_name: supplier.id ? null : supplier.name || null,
+        p_net_quantity: netN,
+        p_deduction_kg: dedKg,
+        p_unit_price: priceN,
+        p_payment_method: pay,
+        p_paid: paid,
+        p_doc_number: docNumber || null,
+        p_doc_date: new Date().toISOString(),
+        p_note: note || null,
+        p_operator_name: null,
+        p_allocations: allocs.map((_, i) => ({ material_id: ids[i], quantity_kg: allocKg[i] })),
+      });
+      if (error) throw new Error(error.message);
+      resetForm();
+      setOpen(false);
+      loadList();
+      loadRefs();
+    } catch (e: any) {
+      setErr(e.message || "Грешка при запис");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
     <div>
       <PageHeader
         title="Доставки"
-        subtitle="Въвеждане на доставки с разпределение по групи"
+        subtitle="Въвеждане на доставки с разпределение по материали"
         actions={
           <button
             className="btn-primary"
@@ -158,7 +171,6 @@ export default function DeliveriesPage() {
                 <th className="th">Дата</th>
                 <th className="th">№</th>
                 <th className="th">Доставчик</th>
-                <th className="th">Материал</th>
                 <th className="th text-right">Нето</th>
                 <th className="th text-right">Отбив</th>
                 <th className="th text-right">Заприх.</th>
@@ -174,7 +186,6 @@ export default function DeliveriesPage() {
                   <td className="td whitespace-nowrap">{fmtDate(d.doc_date)}</td>
                   <td className="td">{d.doc_number || "—"}</td>
                   <td className="td">{d.wh_suppliers?.name || d.supplier_name || "—"}</td>
-                  <td className="td">{d.wh_materials?.name || "—"}</td>
                   <td className="td text-right">{fmtKg(d.net_quantity)}</td>
                   <td className="td text-right">{fmtKg(d.deduction_kg)}</td>
                   <td className="td text-right">{fmtKg(d.accounted_quantity)}</td>
@@ -212,79 +223,39 @@ export default function DeliveriesPage() {
 
       <Modal open={open} onClose={() => setOpen(false)} title="Нова доставка" wide>
         <div className="space-y-4">
-          {/* доставчик */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Доставчик (от база)</label>
-              <select
-                className="input"
-                value={supplierId}
-                onChange={(e) => {
-                  setSupplierId(e.target.value);
-                  if (e.target.value) setSupplierName("");
-                }}
-              >
-                <option value="">— ad-hoc / ръчно —</option>
-                {suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="label">или име ръчно (ad-hoc)</label>
-              <input
-                className="input"
-                value={supplierName}
-                disabled={!!supplierId}
-                onChange={(e) => setSupplierName(e.target.value)}
-                placeholder="Нов доставчик"
+          <FormGrid cols={2}>
+            <Field label="Доставчик" hint="изберете от базата или въведете нов">
+              <Combobox
+                items={suppliers.map((s) => ({ id: s.id, name: s.name }))}
+                value={supplier}
+                onChange={setSupplier}
+                placeholder="Име на доставчик"
               />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Материал</label>
-              <select className="input" value={materialId} onChange={(e) => setMaterialId(e.target.value)}>
-                <option value="">— изберете —</option>
-                {materials.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="label">Документ №</label>
+            </Field>
+            <Field label="Документ №">
               <input className="input" value={docNumber} onChange={(e) => setDocNumber(e.target.value)} />
-            </div>
-          </div>
+            </Field>
+          </FormGrid>
 
-          <div className="grid grid-cols-4 gap-3">
-            <div>
-              <label className="label">Нетно (кг) *</label>
+          <FormGrid cols={4}>
+            <Field label="Нетно (кг)" required>
               <input className="input" type="number" step="0.01" value={net} onChange={(e) => setNet(e.target.value)} />
-            </div>
-            <div>
-              <label className="label">Отбив</label>
+            </Field>
+            <Field label="Отбив">
               <input className="input" type="number" step="0.01" value={ded} onChange={(e) => setDed(e.target.value)} />
-            </div>
-            <div>
-              <label className="label">Отбив в</label>
+            </Field>
+            <Field label="Отбив в">
               <select className="input" value={dedMode} onChange={(e) => setDedMode(e.target.value as any)}>
                 <option value="kg">кг</option>
                 <option value="pct">%</option>
               </select>
-            </div>
-            <div>
-              <label className="label">Цена (лв/кг) *</label>
+            </Field>
+            <Field label="Цена (лв/кг)" required>
               <input className="input" type="number" step="0.0001" value={price} onChange={(e) => setPrice(e.target.value)} />
-            </div>
-          </div>
+            </Field>
+          </FormGrid>
 
-          <div className="grid grid-cols-3 gap-3 rounded-lg bg-slate-50 p-3 text-sm">
+          <div className="grid grid-cols-3 gap-4 rounded-lg bg-slate-50 p-3 text-sm">
             <div>
               <span className="text-slate-500">Заприходено: </span>
               <span className="font-semibold">{fmtKg(accounted)}</span>
@@ -299,36 +270,38 @@ export default function DeliveriesPage() {
             </div>
           </div>
 
-          {/* разпределение по групи */}
+          {/* разпределение по материали */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="label mb-0">Разпределение по групи</label>
+              <label className="label mb-0">Разпределение по материали</label>
               <button
+                type="button"
                 className="text-sm text-brand-600 hover:underline"
-                onClick={() => setAllocs([...allocs, { group_id: "", mode: "kg", amount: "" }])}
+                onClick={() => setAllocs([...allocs, { mat: { ...emptyMat }, mode: "kg", amount: "" }])}
               >
-                + Добави група
+                + Добави материал
               </button>
+            </div>
+            <div className="grid grid-cols-[1fr_84px_104px_96px_32px] gap-2 px-1 pb-1 text-xs font-medium text-slate-400">
+              <div>Материал</div>
+              <div>Вид</div>
+              <div>Стойност</div>
+              <div className="text-right">= кг</div>
+              <div></div>
             </div>
             <div className="space-y-2">
               {allocs.map((a, i) => (
-                <div key={i} className="grid grid-cols-[1fr_90px_110px_90px_32px] gap-2 items-center">
-                  <select
-                    className="input"
-                    value={a.group_id}
-                    onChange={(e) => {
+                <div key={i} className="grid grid-cols-[1fr_84px_104px_96px_32px] gap-2 items-center">
+                  <Combobox
+                    items={materials.map((m) => ({ id: m.material_id, name: m.material_name }))}
+                    value={a.mat}
+                    onChange={(v) => {
                       const c = [...allocs];
-                      c[i].group_id = e.target.value;
+                      c[i].mat = v;
                       setAllocs(c);
                     }}
-                  >
-                    <option value="">— група —</option>
-                    {groups.map((g) => (
-                      <option key={g.group_id} value={g.group_id}>
-                        {g.group_name}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="Материал"
+                  />
                   <select
                     className="input"
                     value={a.mode}
@@ -354,7 +327,8 @@ export default function DeliveriesPage() {
                   />
                   <div className="text-sm text-slate-500 text-right">{fmtKg(allocKg[i])}</div>
                   <button
-                    className="text-slate-400 hover:text-red-600"
+                    type="button"
+                    className="text-slate-400 hover:text-red-600 text-center"
                     onClick={() => setAllocs(allocs.filter((_, j) => j !== i))}
                   >
                     ×
@@ -367,37 +341,34 @@ export default function DeliveriesPage() {
             </div>
           </div>
 
-          {/* плащане */}
-          <div className="grid grid-cols-3 gap-3 items-end">
-            <div>
-              <label className="label">Начин на плащане</label>
+          <FormGrid cols={2}>
+            <Field label="Начин на плащане">
               <select className="input" value={pay} onChange={(e) => setPay(e.target.value as any)}>
                 <option value="cash">В брой</option>
                 <option value="bank">По банка</option>
               </select>
-            </div>
-            <div className="flex items-center gap-2 pb-2">
-              <input id="paid" type="checkbox" checked={paid} onChange={(e) => setPaid(e.target.checked)} className="h-4 w-4" />
-              <label htmlFor="paid" className="text-sm text-slate-700">
-                Платено
+            </Field>
+            <Field label="Статус">
+              <label className="input flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={paid} onChange={(e) => setPaid(e.target.checked)} className="h-4 w-4" />
+                <span className="text-sm text-slate-700">Платено</span>
               </label>
-            </div>
-          </div>
+            </Field>
+          </FormGrid>
 
-          <div>
-            <label className="label">Бележка</label>
+          <Field label="Бележка">
             <input className="input" value={note} onChange={(e) => setNote(e.target.value)} />
-          </div>
+          </Field>
 
-          {err && <p className="text-sm text-red-600">{err}</p>}
-          <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
+          <FormError msg={err} />
+          <FormActions>
             <button className="btn-secondary" onClick={() => setOpen(false)}>
               Отказ
             </button>
             <button className="btn-primary" onClick={save} disabled={saving}>
               {saving ? "Запис…" : "Запиши доставка"}
             </button>
-          </div>
+          </FormActions>
         </div>
       </Modal>
     </div>

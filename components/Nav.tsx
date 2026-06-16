@@ -8,7 +8,6 @@ const links = [
   { href: "/dostavki", label: "Доставки", icon: "📥" },
   { href: "/prodazhbi", label: "Продажби", icon: "📤" },
   { href: "/presortirane", label: "Пресортиране", icon: "🔀" },
-  { href: "/grupi", label: "Групи", icon: "🗂️" },
   { href: "/nomenklatura", label: "Номенклатури", icon: "📚" },
   { href: "/istoria", label: "История", icon: "🕓" },
   { href: "/spravki", label: "Справки", icon: "📈" },

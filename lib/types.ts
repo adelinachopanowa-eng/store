@@ -24,20 +24,11 @@ export type Material = {
   created_at: string;
 };
 
-export type Group = {
-  id: string;
-  name: string;
-  material_id: string | null;
-  description: string | null;
-  active: boolean;
-  created_at: string;
-};
-
-export type GroupBalance = {
-  group_id: string;
-  group_name: string;
-  material_id: string | null;
-  material_name: string | null;
+export type MaterialBalance = {
+  material_id: string;
+  material_name: string;
+  code: string | null;
+  unit: string;
   active: boolean;
   quantity_kg: number;
   total_value: number;
@@ -50,8 +41,8 @@ export type HistoryRow = {
   entry_date: string;
   type: string;
   type_bg: string;
-  group_id: string;
-  group_name: string | null;
+  material_id: string;
+  material_name: string | null;
   quantity_kg: number;
   value: number;
   unit_price: number | null;

@@ -52,7 +52,7 @@ export default function HistoryPage() {
               <tr>
                 <th className="th">Дата</th>
                 <th className="th">Движение</th>
-                <th className="th">Група</th>
+                <th className="th">Материал</th>
                 <th className="th">Контрагент</th>
                 <th className="th text-right">Кол-во</th>
                 <th className="th text-right">Цена</th>
@@ -71,7 +71,7 @@ export default function HistoryPage() {
                         {r.type_bg}
                       </span>
                     </td>
-                    <td className="td">{r.group_name || "—"}</td>
+                    <td className="td">{r.material_name || "—"}</td>
                     <td className="td">{r.supplier_name || "—"}</td>
                     <td className={`td text-right font-medium ${isIn ? "text-emerald-600" : "text-red-600"}`}>
                       {isIn ? "+" : ""}
