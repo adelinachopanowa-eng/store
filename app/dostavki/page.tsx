@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { GroupBalance, Material, Supplier } from "@/lib/types";
 import { fmtKg, fmtLv, fmtPrice, fmtDate } from "@/lib/format";
-import { PageHeader, Loading, Empty, Modal } from "@/components/ui";
+import { PageHeader, Loading, Empty, Modal, VoidButton, VoidedBadge } from "@/components/ui";
 
 type Alloc = { group_id: string; mode: "pct" | "kg"; amount: string };
 
@@ -165,11 +165,12 @@ export default function DeliveriesPage() {
                 <th className="th text-right">Цена</th>
                 <th className="th text-right">Стойност</th>
                 <th className="th">Плащане</th>
+                <th className="th"></th>
               </tr>
             </thead>
             <tbody>
               {list.map((d) => (
-                <tr key={d.id} className="hover:bg-slate-50">
+                <tr key={d.id} className={`hover:bg-slate-50 ${d.voided ? "opacity-50" : ""}`}>
                   <td className="td whitespace-nowrap">{fmtDate(d.doc_date)}</td>
                   <td className="td">{d.doc_number || "—"}</td>
                   <td className="td">{d.wh_suppliers?.name || d.supplier_name || "—"}</td>
@@ -183,6 +184,24 @@ export default function DeliveriesPage() {
                     <span className={`badge ${d.paid ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
                       {d.payment_method === "bank" ? "Банка" : "Брой"} · {d.paid ? "Платено" : "Не"}
                     </span>
+                  </td>
+                  <td className="td">
+                    {d.voided ? (
+                      <VoidedBadge />
+                    ) : (
+                      <VoidButton
+                        onVoid={async (reason) => {
+                          const { error } = await supabase.rpc("wh_void_delivery", {
+                            p_delivery_id: d.id,
+                            p_reason: reason || null,
+                            p_operator_name: null,
+                          });
+                          if (error) return error.message;
+                          loadList();
+                          loadRefs();
+                        }}
+                      />
+                    )}
                   </td>
                 </tr>
               ))}

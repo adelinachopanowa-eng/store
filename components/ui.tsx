@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode } from "react";
+import { ReactNode, useState } from "react";
 
 export function PageHeader({
   title,
@@ -59,6 +59,65 @@ export function Empty({ text }: { text: string }) {
 
 export function Loading() {
   return <div className="p-10 text-center text-slate-400 text-sm">Зареждане…</div>;
+}
+
+export function VoidedBadge() {
+  return <span className="badge bg-slate-200 text-slate-500 line-through">Анулиран</span>;
+}
+
+export function VoidButton({
+  onVoid,
+  label = "Анулирай",
+}: {
+  onVoid: (reason: string) => Promise<string | void>;
+  label?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function confirm() {
+    setBusy(true);
+    setErr("");
+    const error = await onVoid(reason);
+    setBusy(false);
+    if (error) {
+      setErr(error);
+      return;
+    }
+    setOpen(false);
+    setReason("");
+  }
+
+  return (
+    <>
+      <button className="text-xs text-red-600 hover:underline" onClick={() => setOpen(true)}>
+        {label}
+      </button>
+      <Modal open={open} onClose={() => setOpen(false)} title="Анулиране на документ">
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">
+            Документът няма да бъде изтрит — ще остане в историята, но количеството и стойността му ще се
+            извадят от наличността и средната цена. След анулиране можете да въведете коригиран документ.
+          </p>
+          <div>
+            <label className="label">Причина за анулиране</label>
+            <input className="input" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="напр. грешно въведено количество" />
+          </div>
+          {err && <p className="text-sm text-red-600">{err}</p>}
+          <div className="flex justify-end gap-2">
+            <button className="btn-secondary" onClick={() => setOpen(false)}>
+              Отказ
+            </button>
+            <button className="btn-danger" onClick={confirm} disabled={busy}>
+              {busy ? "Анулиране…" : "Анулирай документа"}
+            </button>
+          </div>
+        </div>
+      </Modal>
+    </>
+  );
 }
 
 export function Stat({

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { GroupBalance } from "@/lib/types";
 import { fmtKg, fmtLv, fmtPrice, fmtDate } from "@/lib/format";
-import { PageHeader, Loading, Empty, Modal } from "@/components/ui";
+import { PageHeader, Loading, Empty, Modal, VoidButton, VoidedBadge } from "@/components/ui";
 
 export default function TransfersPage() {
   const [list, setList] = useState<any[]>([]);
@@ -107,11 +107,12 @@ export default function TransfersPage() {
                 <th className="th text-right">Ср. цена</th>
                 <th className="th text-right">Стойност</th>
                 <th className="th">Бележка</th>
+                <th className="th"></th>
               </tr>
             </thead>
             <tbody>
               {list.map((t) => (
-                <tr key={t.id} className="hover:bg-slate-50">
+                <tr key={t.id} className={`hover:bg-slate-50 ${t.voided ? "opacity-50" : ""}`}>
                   <td className="td whitespace-nowrap">{fmtDate(t.doc_date)}</td>
                   <td className="td">{t.from_group?.name || "—"}</td>
                   <td className="td">{t.to_group?.name || "—"}</td>
@@ -119,6 +120,24 @@ export default function TransfersPage() {
                   <td className="td text-right">{fmtPrice(t.avg_cost)}</td>
                   <td className="td text-right">{fmtLv(t.value)}</td>
                   <td className="td text-slate-500">{t.note || "—"}</td>
+                  <td className="td">
+                    {t.voided ? (
+                      <VoidedBadge />
+                    ) : (
+                      <VoidButton
+                        onVoid={async (reason) => {
+                          const { error } = await supabase.rpc("wh_void_transfer", {
+                            p_transfer_id: t.id,
+                            p_reason: reason || null,
+                            p_operator_name: null,
+                          });
+                          if (error) return error.message;
+                          loadList();
+                          loadRefs();
+                        }}
+                      />
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
