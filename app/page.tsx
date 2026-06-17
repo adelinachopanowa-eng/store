@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { MaterialBalance } from "@/lib/types";
-import { fmtKg, fmtLv, fmtPrice, fmtPct } from "@/lib/format";
+import { fmtKg, fmtLv, fmtPrice } from "@/lib/format";
 import { PageHeader, Loading, Empty, Stat } from "@/components/ui";
 
 export default function Dashboard() {
@@ -31,7 +31,7 @@ export default function Dashboard() {
 
   return (
     <div>
-      <PageHeader title="Табло" subtitle="Наличност, средна цена и среден отбив по материали" />
+      <PageHeader title="Табло" subtitle="Наличност и средна цена по материали" />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Stat label="Общо наличност" value={fmtKg(totalQty)} color="blue" />
@@ -53,7 +53,6 @@ export default function Dashboard() {
                 <th className="th text-right">Наличност</th>
                 <th className="th text-right">Средна цена</th>
                 <th className="th text-right">Стойност</th>
-                <th className="th text-right">Среден отбив</th>
               </tr>
             </thead>
             <tbody>
@@ -63,7 +62,6 @@ export default function Dashboard() {
                   <td className="td text-right">{fmtKg(r.quantity_kg)}</td>
                   <td className="td text-right font-medium">{fmtPrice(r.avg_price)}</td>
                   <td className="td text-right">{fmtLv(r.total_value)}</td>
-                  <td className="td text-right">{fmtPct(r.avg_deduction_pct)}</td>
                 </tr>
               ))}
             </tbody>
@@ -73,7 +71,6 @@ export default function Dashboard() {
                 <td className="td text-right">{fmtKg(totalQty)}</td>
                 <td className="td text-right">{fmtPrice(avgAll)}</td>
                 <td className="td text-right">{fmtLv(totalVal)}</td>
-                <td className="td"></td>
               </tr>
             </tfoot>
           </table>

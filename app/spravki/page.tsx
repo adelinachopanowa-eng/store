@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { MaterialBalance } from "@/lib/types";
-import { fmtKg, fmtLv, fmtPrice, fmtPct, fmtDate } from "@/lib/format";
+import { fmtKg, fmtLv, fmtPrice, fmtDate } from "@/lib/format";
 import { PageHeader, Loading, Stat } from "@/components/ui";
 
 type Report = "stock" | "deliveries" | "sales" | "unpaid";
@@ -85,7 +85,6 @@ export default function ReportsPage() {
         "Наличност т": Number(r.quantity_kg).toFixed(3),
         "Средна цена €/т": Number(r.avg_price).toFixed(2),
         "Стойност €": Number(r.total_value).toFixed(2),
-        "Среден отбив %": Number(r.avg_deduction_pct).toFixed(2),
       }));
     else if (report === "deliveries")
       rows = data.map((d) => ({
@@ -93,8 +92,6 @@ export default function ReportsPage() {
         Документ: d.doc_number,
         Доставчик: d.wh_suppliers?.name || d.supplier_name,
         "Нето т": d.net_quantity,
-        "Отбив т": d.deduction_kg,
-        "Отбив %": Number(d.deduction_pct).toFixed(2),
         "Цена €/т": d.unit_price,
         "Стойност €": d.total_value,
         Плащане: d.payment_method === "bank" ? "Банка" : "Брой",
@@ -183,8 +180,8 @@ function ReportTable({ report, data }: { report: Report; data: any[] }) {
         </div>
         <Table
           rightFrom={1}
-          head={["Материал", "Наличност", "Средна цена", "Стойност", "Ср. отбив"]}
-          rows={data.map((r) => [r.material_name, fmtKg(r.quantity_kg), fmtPrice(r.avg_price), fmtLv(r.total_value), fmtPct(r.avg_deduction_pct)])}
+          head={["Материал", "Наличност", "Средна цена", "Стойност"]}
+          rows={data.map((r) => [r.material_name, fmtKg(r.quantity_kg), fmtPrice(r.avg_price), fmtLv(r.total_value)])}
         />
       </>
     );
