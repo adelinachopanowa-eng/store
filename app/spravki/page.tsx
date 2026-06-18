@@ -70,8 +70,8 @@ export default function ReportsPage() {
       ]);
     } else if (report === "to_invoice") {
       const [del, sal] = await Promise.all([
-        supabase.from("wh_deliveries").select("*, wh_suppliers(name)").eq("invoiced", false).eq("voided", false),
-        supabase.from("wh_sales").select("*, wh_suppliers(name)").eq("invoiced", false).eq("voided", false),
+        supabase.from("wh_deliveries").select("*, wh_suppliers(name)").eq("needs_invoice", true).eq("invoiced", false).eq("voided", false),
+        supabase.from("wh_sales").select("*, wh_suppliers(name)").eq("needs_invoice", true).eq("invoiced", false).eq("voided", false),
       ]);
       setData([
         ...(del.data || []).map((x: any) => ({ ...x, _kind: "Доставка", _party: x.wh_suppliers?.name || x.supplier_name, _amount: x.total_value, _date: x.doc_date, _paid: x.paid })),

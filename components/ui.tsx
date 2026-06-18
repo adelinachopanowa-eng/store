@@ -109,10 +109,10 @@ export function InvoiceBadge({ invoiced, number }: { invoiced: boolean; number?:
   if (invoiced)
     return (
       <span className="badge bg-sky-100 text-sky-700" title={number ? `Фактура № ${number}` : undefined}>
-        Фактурирана{number ? ` · ${number}` : ""}
+        ✓ Фактурирана{number ? ` · ${number}` : ""}
       </span>
     );
-  return <span className="badge bg-slate-100 text-slate-500">За фактуриране</span>;
+  return <span className="badge bg-amber-100 text-amber-700">Чака фактура</span>;
 }
 
 export function VoidButton({
