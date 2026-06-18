@@ -21,14 +21,8 @@ export default function TransfersPage() {
   const [list, setList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [editItem, setEditItem] = useState<any | null>(null);
   const [materials, setMaterials] = useState<MaterialBalance[]>([]);
-
-  const [fromId, setFromId] = useState("");
-  const [toId, setToId] = useState("");
-  const [qty, setQty] = useState("");
-  const [note, setNote] = useState("");
-  const [err, setErr] = useState("");
-  const [saving, setSaving] = useState(false);
 
   async function loadRefs() {
     const { data } = await supabase.from("wh_material_balances").select("*").order("material_name");
@@ -49,41 +43,6 @@ export default function TransfersPage() {
     loadList();
   }, []);
 
-  const from = materials.find((m) => m.material_id === fromId);
-  const qtyN = Number(qty) || 0;
-  const moveVal = from ? qtyN * Number(from.avg_price) : 0;
-
-  function reset() {
-    setFromId("");
-    setToId("");
-    setQty("");
-    setNote("");
-    setErr("");
-  }
-
-  async function save() {
-    setErr("");
-    if (!fromId || !toId) return setErr("Изберете източник и цел.");
-    if (fromId === toId) return setErr("Материалите трябва да са различни.");
-    if (qtyN <= 0) return setErr("Въведете количество.");
-    if (from && qtyN > Number(from.quantity_kg) + 0.001) return setErr(`Недостатъчна наличност (${fmtKg(from.quantity_kg)}).`);
-    setSaving(true);
-    const { error } = await supabase.rpc("wh_record_transfer", {
-      p_from_material_id: fromId,
-      p_to_material_id: toId,
-      p_quantity_kg: qtyN,
-      p_doc_date: new Date().toISOString(),
-      p_note: note || null,
-      p_operator_name: null,
-    });
-    setSaving(false);
-    if (error) return setErr(error.message);
-    reset();
-    setOpen(false);
-    loadList();
-    loadRefs();
-  }
-
   return (
     <div>
       <PageHeader
@@ -93,7 +52,7 @@ export default function TransfersPage() {
           <button
             className="btn-primary"
             onClick={() => {
-              reset();
+              setEditItem(null);
               setOpen(true);
             }}
           >
@@ -135,18 +94,26 @@ export default function TransfersPage() {
                     {t.voided ? (
                       <VoidedBadge />
                     ) : (
-                      <VoidButton
-                        onVoid={async (reason) => {
-                          const { error } = await supabase.rpc("wh_void_transfer", {
-                            p_transfer_id: t.id,
-                            p_reason: reason || null,
-                            p_operator_name: null,
-                          });
-                          if (error) return error.message;
-                          loadList();
-                          loadRefs();
-                        }}
-                      />
+                      <div className="flex gap-1 items-center">
+                        <button
+                          className="text-xs text-slate-500 hover:text-brand-600 px-2 py-1 rounded hover:bg-slate-100"
+                          onClick={() => { setEditItem(t); setOpen(true); }}
+                        >
+                          Редакция
+                        </button>
+                        <VoidButton
+                          onVoid={async (reason) => {
+                            const { error } = await supabase.rpc("wh_void_transfer", {
+                              p_transfer_id: t.id,
+                              p_reason: reason || null,
+                              p_operator_name: null,
+                            });
+                            if (error) return error.message;
+                            loadList();
+                            loadRefs();
+                          }}
+                        />
+                      </div>
                     )}
                   </td>
                 </tr>
@@ -156,8 +123,109 @@ export default function TransfersPage() {
         </div>
       )}
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Пресортиране между материали">
-        <div className="space-y-4">
+      <TransferModal
+        open={open}
+        onClose={() => setOpen(false)}
+        editItem={editItem}
+        materials={materials}
+        onSaved={() => { loadList(); loadRefs(); }}
+      />
+    </div>
+  );
+}
+
+function TransferModal({
+  open,
+  onClose,
+  editItem,
+  materials,
+  onSaved,
+}: {
+  open: boolean;
+  onClose: () => void;
+  editItem: any | null;
+  materials: MaterialBalance[];
+  onSaved: () => void;
+}) {
+  const isEdit = !!editItem;
+
+  const [fromId, setFromId] = useState("");
+  const [toId, setToId] = useState("");
+  const [qty, setQty] = useState("");
+  const [docDate, setDocDate] = useState("");
+  const [note, setNote] = useState("");
+  const [err, setErr] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    if (editItem) {
+      setFromId(editItem.from_material_id || "");
+      setToId(editItem.to_material_id || "");
+      setQty(String(editItem.quantity_kg ?? ""));
+      setDocDate(editItem.doc_date ? editItem.doc_date.slice(0, 10) : "");
+      setNote(editItem.note || "");
+    } else {
+      setFromId("");
+      setToId("");
+      setQty("");
+      setDocDate(new Date().toISOString().slice(0, 10));
+      setNote("");
+    }
+    setErr("");
+  }, [open, editItem]);
+
+  const from = materials.find((m) => m.material_id === fromId);
+  const qtyN = Number(qty) || 0;
+  const moveVal = from ? qtyN * Number(from.avg_price) : 0;
+
+  async function save() {
+    setErr("");
+    setSaving(true);
+    try {
+      if (isEdit) {
+        const { error } = await supabase.rpc("wh_update_transfer", {
+          p_transfer_id: editItem.id,
+          p_doc_date: docDate ? new Date(docDate + "T12:00:00").toISOString() : null,
+          p_note: note || null,
+        });
+        if (error) throw new Error(error.message);
+      } else {
+        if (!fromId || !toId) return setErr("Изберете източник и цел.");
+        if (fromId === toId) return setErr("Материалите трябва да са различни.");
+        if (qtyN <= 0) return setErr("Въведете количество.");
+        if (from && qtyN > Number(from.quantity_kg) + 0.001)
+          return setErr(`Недостатъчна наличност (${fmtKg(from.quantity_kg)}).`);
+
+        const { error } = await supabase.rpc("wh_record_transfer", {
+          p_from_material_id: fromId,
+          p_to_material_id: toId,
+          p_quantity_kg: qtyN,
+          p_doc_date: docDate ? new Date(docDate + "T12:00:00").toISOString() : new Date().toISOString(),
+          p_note: note || null,
+          p_operator_name: null,
+        });
+        if (error) throw new Error(error.message);
+      }
+      onSaved();
+      onClose();
+    } catch (e: any) {
+      setErr(e.message || "Грешка при запис");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title={isEdit ? "Редакция на пресортиране" : "Пресортиране между материали"}>
+      <div className="space-y-4">
+        {isEdit ? (
+          <div className="rounded-lg bg-slate-50 p-3 text-sm space-y-1">
+            <div><span className="text-slate-500">От: </span><span className="font-medium">{editItem?.from_mat?.name}</span></div>
+            <div><span className="text-slate-500">Към: </span><span className="font-medium">{editItem?.to_mat?.name}</span></div>
+            <div><span className="text-slate-500">Количество: </span><span className="font-medium">{fmtKg(editItem?.quantity_kg)}</span></div>
+          </div>
+        ) : (
           <FormGrid cols={1}>
             <Field label="От материал" required>
               <select className="input" value={fromId} onChange={(e) => setFromId(e.target.value)}>
@@ -185,28 +253,31 @@ export default function TransfersPage() {
               <input className="input" type="number" step="0.001" value={qty} onChange={(e) => setQty(e.target.value)} />
             </Field>
           </FormGrid>
+        )}
 
-          {from && (
-            <div className="rounded-lg bg-slate-50 p-3 text-sm">
-              Прехвърля се по средна цена <b>{fmtPrice(from.avg_price)}</b> на стойност <b>{fmtLv(moveVal)}</b>.
-            </div>
-          )}
+        {!isEdit && from && (
+          <div className="rounded-lg bg-slate-50 p-3 text-sm">
+            Прехвърля се по средна цена <b>{fmtPrice(from.avg_price)}</b> на стойност <b>{fmtLv(moveVal)}</b>.
+          </div>
+        )}
 
+        <FormGrid cols={2}>
+          <Field label="Дата">
+            <input className="input" type="date" value={docDate} onChange={(e) => setDocDate(e.target.value)} />
+          </Field>
           <Field label="Бележка">
             <input className="input" value={note} onChange={(e) => setNote(e.target.value)} />
           </Field>
+        </FormGrid>
 
-          <FormError msg={err} />
-          <FormActions>
-            <button className="btn-secondary" onClick={() => setOpen(false)}>
-              Отказ
-            </button>
-            <button className="btn-primary" onClick={save} disabled={saving}>
-              {saving ? "Запис…" : "Прехвърли"}
-            </button>
-          </FormActions>
-        </div>
-      </Modal>
-    </div>
+        <FormError msg={err} />
+        <FormActions>
+          <button className="btn-secondary" onClick={onClose}>Отказ</button>
+          <button className="btn-primary" onClick={save} disabled={saving}>
+            {saving ? "Запис…" : isEdit ? "Запази промените" : "Прехвърли"}
+          </button>
+        </FormActions>
+      </div>
+    </Modal>
   );
 }

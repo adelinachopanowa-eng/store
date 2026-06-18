@@ -10,21 +10,14 @@ type Tab = "materials" | "suppliers";
 
 export default function NomenclaturePage() {
   const [tab, setTab] = useState<Tab>("materials");
-
   return (
     <div>
       <PageHeader title="Номенклатури" subtitle="База данни за бързо въвеждане" />
       <div className="flex gap-2 mb-4">
-        <button
-          className={tab === "materials" ? "btn-primary" : "btn-secondary"}
-          onClick={() => setTab("materials")}
-        >
+        <button className={tab === "materials" ? "btn-primary" : "btn-secondary"} onClick={() => setTab("materials")}>
           Материали
         </button>
-        <button
-          className={tab === "suppliers" ? "btn-primary" : "btn-secondary"}
-          onClick={() => setTab("suppliers")}
-        >
+        <button className={tab === "suppliers" ? "btn-primary" : "btn-secondary"} onClick={() => setTab("suppliers")}>
           Контрагенти
         </button>
       </div>
@@ -33,10 +26,13 @@ export default function NomenclaturePage() {
   );
 }
 
+// ─── Materials ───────────────────────────────────────────────────────────────
+
 function Materials() {
   const [rows, setRows] = useState<Material[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [editItem, setEditItem] = useState<Material | null>(null);
   const [f, setF] = useState({ name: "", code: "", waste_code: "", unit: "т", default_price: "" });
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);
@@ -47,27 +43,53 @@ function Materials() {
     setRows((data as Material[]) || []);
     setLoading(false);
   }
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, []);
+
+  function openNew() {
+    setEditItem(null);
+    setF({ name: "", code: "", waste_code: "", unit: "т", default_price: "" });
+    setErr("");
+    setOpen(true);
+  }
+  function openEdit(m: Material) {
+    setEditItem(m);
+    setF({
+      name: m.name,
+      code: m.code || "",
+      waste_code: m.waste_code || "",
+      unit: m.unit || "т",
+      default_price: m.default_price != null ? String(m.default_price) : "",
+    });
+    setErr("");
+    setOpen(true);
+  }
 
   async function save() {
-    if (!f.name.trim()) {
-      setErr("Въведете име");
-      return;
-    }
+    if (!f.name.trim()) { setErr("Въведете ime"); return; }
     setSaving(true);
     setErr("");
-    const { error } = await supabase.from("wh_materials").insert({
-      name: f.name.trim(),
-      code: f.code || null,
-      waste_code: f.waste_code || null,
-      unit: f.unit || "т",
-      default_price: f.default_price ? Number(f.default_price) : null,
-    });
-    setSaving(false);
-    if (error) return setErr(error.message);
-    setF({ name: "", code: "", waste_code: "", unit: "т", default_price: "" });
+    if (editItem) {
+      const { error } = await supabase.rpc("wh_update_material", {
+        p_id: editItem.id,
+        p_name: f.name.trim(),
+        p_code: f.code || "",
+        p_waste_code: f.waste_code || "",
+        p_unit: f.unit || "т",
+        p_default_price: f.default_price ? Number(f.default_price) : null,
+      });
+      setSaving(false);
+      if (error) return setErr(error.message);
+    } else {
+      const { error } = await supabase.from("wh_materials").insert({
+        name: f.name.trim(),
+        code: f.code || null,
+        waste_code: f.waste_code || null,
+        unit: f.unit || "т",
+        default_price: f.default_price ? Number(f.default_price) : null,
+      });
+      setSaving(false);
+      if (error) return setErr(error.message);
+    }
     setOpen(false);
     load();
   }
@@ -75,15 +97,9 @@ function Materials() {
   return (
     <div>
       <div className="flex justify-end mb-3">
-        <button className="btn-primary" onClick={() => setOpen(true)}>
-          + Нов материал
-        </button>
+        <button className="btn-primary" onClick={openNew}>+ Нов материал</button>
       </div>
-      {loading ? (
-        <Loading />
-      ) : rows.length === 0 ? (
-        <Empty text="Няма материали." />
-      ) : (
+      {loading ? <Loading /> : rows.length === 0 ? <Empty text="Няма материали." /> : (
         <div className="card overflow-hidden">
           <table className="w-full">
             <thead className="bg-slate-50">
@@ -93,6 +109,7 @@ function Materials() {
                 <th className="th">Код отпадък</th>
                 <th className="th">Мярка</th>
                 <th className="th text-right">Ориент. цена</th>
+                <th className="th"></th>
               </tr>
             </thead>
             <tbody>
@@ -103,6 +120,14 @@ function Materials() {
                   <td className="td">{m.waste_code || "—"}</td>
                   <td className="td">{m.unit}</td>
                   <td className="td text-right">{m.default_price != null ? fmtPrice(m.default_price) : "—"}</td>
+                  <td className="td">
+                    <button
+                      className="text-xs text-slate-500 hover:text-brand-600 px-2 py-1 rounded hover:bg-slate-100"
+                      onClick={() => openEdit(m)}
+                    >
+                      Редакция
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -110,7 +135,7 @@ function Materials() {
         </div>
       )}
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Нов материал">
+      <Modal open={open} onClose={() => setOpen(false)} title={editItem ? "Редакция на материал" : "Нов материал"}>
         <div className="space-y-4">
           <Field label="Наименование" required>
             <input className="input" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
@@ -131,11 +156,9 @@ function Materials() {
           </FormGrid>
           <FormError msg={err} />
           <FormActions>
-            <button className="btn-secondary" onClick={() => setOpen(false)}>
-              Отказ
-            </button>
+            <button className="btn-secondary" onClick={() => setOpen(false)}>Отказ</button>
             <button className="btn-primary" onClick={save} disabled={saving}>
-              {saving ? "Запис…" : "Запази"}
+              {saving ? "Запис…" : editItem ? "Запази промените" : "Запази"}
             </button>
           </FormActions>
         </div>
@@ -144,10 +167,13 @@ function Materials() {
   );
 }
 
+// ─── Suppliers ───────────────────────────────────────────────────────────────
+
 function Suppliers() {
   const [rows, setRows] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [editItem, setEditItem] = useState<Supplier | null>(null);
   const [f, setF] = useState({ name: "", kind: "supplier", eik: "", egn: "", city: "", phone: "" });
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);
@@ -158,28 +184,49 @@ function Suppliers() {
     setRows((data as Supplier[]) || []);
     setLoading(false);
   }
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, []);
+
+  function openNew() {
+    setEditItem(null);
+    setF({ name: "", kind: "supplier", eik: "", egn: "", city: "", phone: "" });
+    setErr("");
+    setOpen(true);
+  }
+  function openEdit(s: Supplier) {
+    setEditItem(s);
+    setF({ name: s.name, kind: s.kind, eik: s.eik || "", egn: s.egn || "", city: s.city || "", phone: s.phone || "" });
+    setErr("");
+    setOpen(true);
+  }
 
   async function save() {
-    if (!f.name.trim()) {
-      setErr("Въведете име");
-      return;
-    }
+    if (!f.name.trim()) { setErr("Въведете ime"); return; }
     setSaving(true);
     setErr("");
-    const { error } = await supabase.from("wh_suppliers").insert({
-      name: f.name.trim(),
-      kind: f.kind,
-      eik: f.eik || null,
-      egn: f.egn || null,
-      city: f.city || null,
-      phone: f.phone || null,
-    });
-    setSaving(false);
-    if (error) return setErr(error.message);
-    setF({ name: "", kind: "supplier", eik: "", egn: "", city: "", phone: "" });
+    if (editItem) {
+      const { error } = await supabase.rpc("wh_update_supplier", {
+        p_id: editItem.id,
+        p_name: f.name.trim(),
+        p_kind: f.kind,
+        p_eik: f.eik || "",
+        p_egn: f.egn || "",
+        p_city: f.city || "",
+        p_phone: f.phone || "",
+      });
+      setSaving(false);
+      if (error) return setErr(error.message);
+    } else {
+      const { error } = await supabase.from("wh_suppliers").insert({
+        name: f.name.trim(),
+        kind: f.kind,
+        eik: f.eik || null,
+        egn: f.egn || null,
+        city: f.city || null,
+        phone: f.phone || null,
+      });
+      setSaving(false);
+      if (error) return setErr(error.message);
+    }
     setOpen(false);
     load();
   }
@@ -189,25 +236,20 @@ function Suppliers() {
   return (
     <div>
       <div className="flex justify-end mb-3">
-        <button className="btn-primary" onClick={() => setOpen(true)}>
-          + Нов контрагент
-        </button>
+        <button className="btn-primary" onClick={openNew}>+ Нов контрагент</button>
       </div>
-      {loading ? (
-        <Loading />
-      ) : rows.length === 0 ? (
-        <Empty text="Няма контрагенти." />
-      ) : (
+      {loading ? <Loading /> : rows.length === 0 ? <Empty text="Няма контрагенти." /> : (
         <div className="card overflow-hidden">
           <table className="w-full">
             <thead className="bg-slate-50">
               <tr>
-                <th className="th">Име</th>
+                <th className="th">Ime</th>
                 <th className="th">Тип</th>
                 <th className="th">ЕИК</th>
                 <th className="th">ЕГН</th>
                 <th className="th">Град</th>
                 <th className="th">Телефон</th>
+                <th className="th"></th>
               </tr>
             </thead>
             <tbody>
@@ -219,6 +261,14 @@ function Suppliers() {
                   <td className="td">{s.egn || "—"}</td>
                   <td className="td">{s.city || "—"}</td>
                   <td className="td">{s.phone || "—"}</td>
+                  <td className="td">
+                    <button
+                      className="text-xs text-slate-500 hover:text-brand-600 px-2 py-1 rounded hover:bg-slate-100"
+                      onClick={() => openEdit(s)}
+                    >
+                      Редакция
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -226,10 +276,10 @@ function Suppliers() {
         </div>
       )}
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Нов контрагент">
+      <Modal open={open} onClose={() => setOpen(false)} title={editItem ? "Редакция на контрагент" : "Нов контрагент"}>
         <div className="space-y-4">
           <FormGrid cols={2}>
-            <Field label="Име" required>
+            <Field label="Ime" required>
               <input className="input" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
             </Field>
             <Field label="Тип">
@@ -254,11 +304,9 @@ function Suppliers() {
           </FormGrid>
           <FormError msg={err} />
           <FormActions>
-            <button className="btn-secondary" onClick={() => setOpen(false)}>
-              Отказ
-            </button>
+            <button className="btn-secondary" onClick={() => setOpen(false)}>Отказ</button>
             <button className="btn-primary" onClick={save} disabled={saving}>
-              {saving ? "Запис…" : "Запази"}
+              {saving ? "Запис…" : editItem ? "Запази промените" : "Запази"}
             </button>
           </FormActions>
         </div>
