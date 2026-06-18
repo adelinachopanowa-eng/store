@@ -33,7 +33,6 @@ export type MaterialBalance = {
   quantity_kg: number;
   total_value: number;
   avg_price: number;
-  avg_deduction_pct: number;
 };
 
 export type HistoryRow = {
@@ -46,7 +45,6 @@ export type HistoryRow = {
   quantity_kg: number;
   value: number;
   unit_price: number | null;
-  deduction_pct: number | null;
   supplier_name: string | null;
   note: string | null;
   operator_name: string | null;

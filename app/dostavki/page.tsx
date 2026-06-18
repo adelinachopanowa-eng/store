@@ -262,7 +262,6 @@ function DeliveryModal({
           p_supplier_id: supplier.id,
           p_supplier_name: supplier.id ? null : supplier.name || null,
           p_net_quantity: netN,
-          p_deduction_kg: 0,
           p_unit_price: priceN,
           p_payment_method: pay,
           p_paid: paid,
