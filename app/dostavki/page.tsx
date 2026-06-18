@@ -15,6 +15,7 @@ import {
   FormError,
   VoidButton,
   VoidedBadge,
+  InvoiceBadge,
 } from "@/components/ui";
 import Combobox, { ComboValue } from "@/components/Combobox";
 
@@ -86,6 +87,7 @@ export default function DeliveriesPage() {
                 <th className="th text-right">Нето</th>
                 <th className="th text-right">Цена</th>
                 <th className="th text-right">Стойност</th>
+                <th className="th">Фактура</th>
                 <th className="th">Плащане</th>
                 <th className="th"></th>
               </tr>
@@ -99,6 +101,9 @@ export default function DeliveriesPage() {
                   <td className="td text-right">{fmtKg(d.net_quantity)}</td>
                   <td className="td text-right">{d.unit_price != null ? fmtPrice(d.unit_price) : <span className="text-amber-500 text-xs">без цена</span>}</td>
                   <td className="td text-right font-medium">{d.total_value != null ? fmtLv(d.total_value) : "—"}</td>
+                  <td className="td">
+                    <InvoiceBadge invoiced={d.invoiced} number={d.invoice_number} />
+                  </td>
                   <td className="td">
                     <span className={`badge ${d.paid ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
                       {d.payment_method === "bank" ? "Банка" : "Брой"} · {d.paid ? "Платено" : "Не"}
@@ -173,6 +178,9 @@ function DeliveryModal({
   const [price, setPrice] = useState("");
   const [pay, setPay] = useState<"cash" | "bank">("cash");
   const [paid, setPaid] = useState(false);
+  const [invoiced, setInvoiced] = useState(false);
+  const [invNumber, setInvNumber] = useState("");
+  const [invDate, setInvDate] = useState("");
   const [docNumber, setDocNumber] = useState("");
   const [docDate, setDocDate] = useState("");
   const [note, setNote] = useState("");
@@ -193,6 +201,9 @@ function DeliveryModal({
       setPrice(editItem.unit_price != null ? String(editItem.unit_price) : "");
       setPay(editItem.payment_method || "cash");
       setPaid(!!editItem.paid);
+      setInvoiced(!!editItem.invoiced);
+      setInvNumber(editItem.invoice_number || "");
+      setInvDate(editItem.invoice_date ? editItem.invoice_date.slice(0, 10) : "");
       setDocNumber(editItem.doc_number || "");
       setDocDate(editItem.doc_date ? editItem.doc_date.slice(0, 10) : "");
       setNote(editItem.note || "");
@@ -203,6 +214,9 @@ function DeliveryModal({
       setPrice("");
       setPay("cash");
       setPaid(false);
+      setInvoiced(false);
+      setInvNumber("");
+      setInvDate("");
       setDocNumber("");
       setDocDate("");
       setNote("");
@@ -240,6 +254,9 @@ function DeliveryModal({
           p_payment_method: pay,
           p_paid: paid,
           p_note: note || null,
+          p_invoiced: invoiced,
+          p_invoice_number: invoiced ? invNumber || null : null,
+          p_invoice_date: invoiced && invDate ? new Date(invDate + "T12:00:00").toISOString() : null,
         });
         if (error) throw new Error(error.message);
       } else {
@@ -419,6 +436,25 @@ function DeliveryModal({
             </label>
           </Field>
         </FormGrid>
+
+        {isEdit && (
+          <div className="rounded-lg border border-slate-200 p-3 space-y-3">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={invoiced} onChange={(e) => setInvoiced(e.target.checked)} className="h-4 w-4" />
+              <span className="text-sm font-medium text-slate-700">Фактурирана</span>
+            </label>
+            {invoiced && (
+              <FormGrid cols={2}>
+                <Field label="Фактура №">
+                  <input className="input" value={invNumber} onChange={(e) => setInvNumber(e.target.value)} />
+                </Field>
+                <Field label="Дата на фактура">
+                  <input className="input" type="date" value={invDate} onChange={(e) => setInvDate(e.target.value)} />
+                </Field>
+              </FormGrid>
+            )}
+          </div>
+        )}
 
         <Field label="Бележка">
           <input className="input" value={note} onChange={(e) => setNote(e.target.value)} />

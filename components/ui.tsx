@@ -105,6 +105,16 @@ export function VoidedBadge() {
   return <span className="badge bg-slate-200 text-slate-500 line-through">Анулиран</span>;
 }
 
+export function InvoiceBadge({ invoiced, number }: { invoiced: boolean; number?: string | null }) {
+  if (invoiced)
+    return (
+      <span className="badge bg-sky-100 text-sky-700" title={number ? `Фактура № ${number}` : undefined}>
+        Фактурирана{number ? ` · ${number}` : ""}
+      </span>
+    );
+  return <span className="badge bg-slate-100 text-slate-500">За фактуриране</span>;
+}
+
 export function VoidButton({
   onVoid,
   label = "Анулирай",

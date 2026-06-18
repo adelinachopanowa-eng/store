@@ -6,7 +6,7 @@ import { MaterialBalance } from "@/lib/types";
 import { fmtKg, fmtLv, fmtPrice, fmtDate } from "@/lib/format";
 import { PageHeader, Loading, Stat } from "@/components/ui";
 
-type Report = "stock" | "deliveries" | "sales" | "unpaid";
+type Report = "stock" | "deliveries" | "sales" | "to_invoice" | "unpaid";
 
 function toCSV(rows: Record<string, any>[]): string {
   if (!rows.length) return "";
@@ -61,12 +61,21 @@ export default function ReportsPage() {
       setData(d || []);
     } else if (report === "unpaid") {
       const [del, sal] = await Promise.all([
-        supabase.from("wh_deliveries").select("*, wh_suppliers(name)").eq("paid", false),
-        supabase.from("wh_sales").select("*, wh_suppliers(name)").eq("paid", false),
+        supabase.from("wh_deliveries").select("*, wh_suppliers(name)").eq("paid", false).eq("voided", false),
+        supabase.from("wh_sales").select("*, wh_suppliers(name)").eq("paid", false).eq("voided", false),
       ]);
       setData([
         ...(del.data || []).map((x: any) => ({ ...x, _kind: "Доставка", _party: x.wh_suppliers?.name || x.supplier_name, _amount: x.total_value })),
         ...(sal.data || []).map((x: any) => ({ ...x, _kind: "Продажба", _party: x.wh_suppliers?.name || x.buyer_name, _amount: x.sale_value })),
+      ]);
+    } else if (report === "to_invoice") {
+      const [del, sal] = await Promise.all([
+        supabase.from("wh_deliveries").select("*, wh_suppliers(name)").eq("invoiced", false).eq("voided", false),
+        supabase.from("wh_sales").select("*, wh_suppliers(name)").eq("invoiced", false).eq("voided", false),
+      ]);
+      setData([
+        ...(del.data || []).map((x: any) => ({ ...x, _kind: "Доставка", _party: x.wh_suppliers?.name || x.supplier_name, _amount: x.total_value, _date: x.doc_date, _paid: x.paid })),
+        ...(sal.data || []).map((x: any) => ({ ...x, _kind: "Продажба", _party: x.wh_suppliers?.name || x.buyer_name, _amount: x.sale_value, _date: x.doc_date, _paid: x.paid })),
       ]);
     }
     setLoading(false);
@@ -118,6 +127,15 @@ export default function ReportsPage() {
         "Сума €": x._amount,
         Плащане: x.payment_method === "bank" ? "Банка" : "Брой",
       }));
+    else if (report === "to_invoice")
+      rows = data.map((x) => ({
+        Тип: x._kind,
+        Дата: fmtDate(x._date),
+        Документ: x.doc_number,
+        Контрагент: x._party,
+        "Сума €": x._amount,
+        Платено: x._paid ? "Да" : "Не",
+      }));
     download(`spravka_${report}_${today}.csv`, toCSV(rows));
   }
 
@@ -138,6 +156,7 @@ export default function ReportsPage() {
           ["stock", "Складови наличности"],
           ["deliveries", "Доставки за период"],
           ["sales", "Продажби и печалба"],
+          ["to_invoice", "За фактуриране"],
           ["unpaid", "Неплатени"],
         ] as [Report, string][]).map(([v, l]) => (
           <button key={v} className={report === v ? "btn-primary" : "btn-secondary"} onClick={() => setReport(v)}>
@@ -233,6 +252,29 @@ function ReportTable({ report, data }: { report: Report; data: any[] }) {
             fmtLv(s.cost_value),
             s.sale_value != null ? fmtLv(s.sale_value) : "—",
             s.sale_value != null ? fmtLv(s.sale_value - s.cost_value) : "—",
+          ])}
+        />
+      </>
+    );
+  }
+  if (report === "to_invoice") {
+    const tot = data.reduce((s, x) => s + Number(x._amount || 0), 0);
+    return (
+      <>
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <Stat label="Брой за фактуриране" value={String(data.length)} color="amber" />
+          <Stat label="Обща сума" value={fmtLv(tot)} color="blue" />
+        </div>
+        <Table
+          rightFrom={4}
+          head={["Тип", "Дата", "Документ", "Контрагент", "Сума", "Платено"]}
+          rows={data.map((x) => [
+            x._kind,
+            fmtDate(x._date),
+            x.doc_number || "—",
+            x._party || "—",
+            x._amount != null ? fmtLv(x._amount) : "—",
+            x._paid ? "Да" : "Не",
           ])}
         />
       </>
