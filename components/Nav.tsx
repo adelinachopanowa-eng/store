@@ -5,12 +5,14 @@ import { usePathname } from "next/navigation";
 
 const links = [
   { href: "/", label: "Табло", icon: "📊" },
+  { href: "/kantar", label: "Кантарни бележки", icon: "⚖️" },
   { href: "/dostavki", label: "Доставки", icon: "📥" },
   { href: "/prodazhbi", label: "Продажби", icon: "📤" },
   { href: "/presortirane", label: "Пресортиране", icon: "🔀" },
   { href: "/nomenklatura", label: "Номенклатури", icon: "📚" },
   { href: "/istoria", label: "История", icon: "🕓" },
   { href: "/spravki", label: "Справки", icon: "📈" },
+  { href: "/nastroyki", label: "Настройки", icon: "⚙️" },
 ];
 
 export default function Nav() {

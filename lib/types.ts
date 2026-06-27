@@ -52,3 +52,16 @@ export type HistoryRow = {
 };
 
 export type PaymentMethod = "cash" | "bank";
+
+export type Company = {
+  id: number;
+  name: string | null;
+  eik: string | null;
+  vat_no: string | null;
+  address: string | null;
+  city: string | null;
+  phone: string | null;
+  email: string | null;
+  mol: string | null;
+  site_name: string | null;
+};

@@ -42,3 +42,28 @@ body {
     @apply px-3 py-2 text-sm text-slate-700 border-t border-slate-100;
   }
 }
+
+/* ─── Печат на кантарна бележка (A4) ─────────────────────────────────────── */
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+  body {
+    background: #fff !important;
+  }
+  aside,
+  .no-print {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+    max-width: none !important;
+  }
+  .print-sheet {
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+}
