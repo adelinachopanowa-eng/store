@@ -63,10 +63,10 @@ export default function WeighNotePrint() {
       {/* A4 лист */}
       <div className="print-sheet bg-white shadow-sm border border-slate-200 mx-auto" style={{ width: "210mm", minHeight: "297mm", padding: "16mm" }}>
         {/* Хедър с фирмени данни */}
-        <div className="flex items-start justify-between border-b-2 border-slate-800 pb-4">
+        <div className="flex items-start justify-between border-b-4 border-brand-600 pb-4">
           <div className="flex items-center gap-4">
-            <div className="h-16 w-16 rounded-lg bg-slate-800 text-white flex items-center justify-center text-2xl font-black">
-              {(company?.name || "P").slice(0, 1)}
+            <div className="h-16 w-16 rounded-lg bg-brand-600 text-white flex items-center justify-center text-2xl font-black border-b-4 border-accent-400">
+              {(company?.name || "П").slice(0, 1)}
             </div>
             <div>
               <div className="text-2xl font-black tracking-tight text-slate-900">{company?.name || "—"}</div>
@@ -84,7 +84,7 @@ export default function WeighNotePrint() {
           </div>
           <div className="text-right">
             <div className="text-xs uppercase tracking-widest text-slate-500">Кантарна бележка</div>
-            <div className="text-4xl font-black text-slate-900">№ {d.seq_no ?? "—"}</div>
+            <div className="text-4xl font-black text-brand-700">№ {d.seq_no ?? "—"}</div>
             {company?.site_name && <div className="text-xs text-slate-500 mt-1">Площадка: {company.site_name}</div>}
           </div>
         </div>
@@ -171,10 +171,10 @@ function InfoBox({ label, children }: { label: string; children: React.ReactNode
 
 function WeightCell({ label, value, unit, highlight }: { label: string; value: string; unit: string; highlight?: boolean }) {
   return (
-    <div className={`p-5 text-center ${highlight ? "bg-slate-800 text-white" : "bg-white text-slate-900"}`}>
-      <div className={`text-xs uppercase tracking-widest ${highlight ? "text-slate-300" : "text-slate-500"}`}>{label}</div>
+    <div className={`p-5 text-center ${highlight ? "bg-brand-600 text-white" : "bg-white text-slate-900"}`}>
+      <div className={`text-xs uppercase tracking-widest ${highlight ? "text-accent-400" : "text-slate-500"}`}>{label}</div>
       <div className="text-3xl font-black mt-1 tabular-nums">{value}</div>
-      <div className={`text-xs ${highlight ? "text-slate-300" : "text-slate-400"}`}>{unit}</div>
+      <div className={`text-xs ${highlight ? "text-brand-100" : "text-slate-400"}`}>{unit}</div>
     </div>
   );
 }

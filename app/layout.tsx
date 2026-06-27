@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import Nav from "@/components/Nav";
 
 export const metadata: Metadata = {
-  title: "Progresstrade · Складова програма",
-  description: "Складова програма за скрап със средно претеглена цена по групи",
+  title: "Прогрестрейд · Складова програма",
+  description: "Складова програма за скрап със средно претеглена цена",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

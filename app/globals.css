@@ -7,7 +7,7 @@
 }
 
 body {
-  @apply bg-slate-100 text-slate-800;
+  @apply bg-cream text-slate-800;
 }
 
 @layer components {
@@ -17,6 +17,9 @@ body {
   .btn-primary {
     @apply btn bg-brand-600 text-white hover:bg-brand-700;
   }
+  .btn-yellow {
+    @apply btn bg-accent-400 text-brand-700 hover:bg-accent-500;
+  }
   .btn-secondary {
     @apply btn bg-white text-slate-700 border border-slate-300 hover:bg-slate-50;
   }
@@ -24,7 +27,7 @@ body {
     @apply btn bg-red-600 text-white hover:bg-red-700;
   }
   .input {
-    @apply w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500;
+    @apply w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600;
   }
   .label {
     @apply block text-sm font-medium text-slate-600 mb-1;
@@ -36,7 +39,7 @@ body {
     @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium;
   }
   .th {
-    @apply px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500;
+    @apply px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide bg-brand-600 text-white;
   }
   .td {
     @apply px-3 py-2 text-sm text-slate-700 border-t border-slate-100;
