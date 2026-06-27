@@ -81,8 +81,9 @@ export default function DeliveriesPage() {
           <table className="w-full">
             <thead className="bg-slate-50">
               <tr>
+                <th className="th">Скл. №</th>
                 <th className="th">Дата</th>
-                <th className="th">№</th>
+                <th className="th">Документ №</th>
                 <th className="th">Доставчик</th>
                 <th className="th text-right">Нето</th>
                 <th className="th text-right">Цена</th>
@@ -95,6 +96,7 @@ export default function DeliveriesPage() {
             <tbody>
               {list.map((d) => (
                 <tr key={d.id} className={`hover:bg-slate-50 ${d.voided ? "opacity-50" : ""}`}>
+                  <td className="td font-semibold text-slate-700">{d.seq_no ?? "—"}</td>
                   <td className="td whitespace-nowrap">{fmtDate(d.doc_date)}</td>
                   <td className="td">{d.doc_number || "—"}</td>
                   <td className="td">{d.wh_suppliers?.name || d.supplier_name || "—"}</td>

@@ -97,7 +97,14 @@ export default function SalesPage() {
                   <td className="td">{s.doc_number || "—"}</td>
                   <td className="td">{s.wh_materials?.name || "—"}</td>
                   <td className="td">{s.wh_suppliers?.name || s.buyer_name || "—"}</td>
-                  <td className="td text-right">{fmtKg(s.quantity_kg)}</td>
+                  <td className="td text-right">
+                    {fmtKg(s.quantity_kg)}
+                    {Number(s.shortage_qty) > 0 && (
+                      <span className="ml-1 badge bg-rose-100 text-rose-700" title={`Протокол за липса: ${fmtKg(s.shortage_qty)}`}>
+                        липса {fmtKg(s.shortage_qty)}
+                      </span>
+                    )}
+                  </td>
                   <td className="td text-right">{fmtPrice(s.avg_cost)}</td>
                   <td className="td text-right">
                     {s.unit_price != null ? fmtPrice(s.unit_price) : <span className="text-amber-500 text-xs">без цена</span>}
@@ -188,6 +195,7 @@ function SaleModal({
   const [docNumber, setDocNumber] = useState("");
   const [docDate, setDocDate] = useState("");
   const [note, setNote] = useState("");
+  const [allowShortage, setAllowShortage] = useState(false);
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -226,13 +234,18 @@ function SaleModal({
       setDocDate("");
       setNote("");
     }
+    setAllowShortage(false);
     setErr("");
   }, [open, editItem]);
 
   const sel = materials.find((m) => m.material_id === materialId);
   const qtyN = Number(qty) || 0;
   const priceN = price !== "" ? Number(price) : null;
-  const cost = sel ? qtyN * Number(sel.avg_price) : 0;
+  const avail = sel ? Math.max(Number(sel.quantity_kg), 0) : 0;
+  const avg = sel ? Number(sel.avg_price) : 0;
+  const shortage = sel ? Math.max(0, qtyN - avail) : 0;
+  // Наличната част се изписва по средна цена; липсата е придобита на цена 0.
+  const cost = Math.min(qtyN, avail) * avg;
   const revenue = priceN != null ? qtyN * priceN : null;
   const profit = revenue != null ? revenue - cost : null;
 
@@ -260,7 +273,8 @@ function SaleModal({
       } else {
         if (!materialId) return setErr("Изберете материал.");
         if (qtyN <= 0) return setErr("Въведете количество.");
-        if (sel && qtyN > Number(sel.quantity_kg) + 0.001) return setErr(`Недостатъчна наличност (${fmtKg(sel.quantity_kg)}).`);
+        if (shortage > 0.001 && !allowShortage)
+          return setErr(`Количеството надвишава наличността (${fmtKg(avail)}). Отбележете „Издай протокол за липса", за да продължите.`);
 
         const { error } = await supabase.rpc("wh_record_sale", {
           p_material_id: materialId,
@@ -274,6 +288,7 @@ function SaleModal({
           p_doc_date: docDate ? new Date(docDate + "T12:00:00").toISOString() : new Date().toISOString(),
           p_note: note || null,
           p_operator_name: null,
+          p_allow_shortage: allowShortage,
         });
         if (error) throw new Error(error.message);
       }
@@ -357,6 +372,23 @@ function SaleModal({
               <span className={`font-semibold ${profit != null ? (profit >= 0 ? "text-emerald-600" : "text-red-600") : ""}`}>
                 {profit != null ? fmtLv(profit) : "—"}
               </span>
+            </div>
+          </div>
+        )}
+
+        {!isEdit && sel && shortage > 0.001 && (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm space-y-2">
+            <div className="text-amber-800">
+              Заявеното количество надвишава наличността с <b>{fmtKg(shortage)}</b> (налично: {fmtKg(avail)}).
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={allowShortage} onChange={(e) => setAllowShortage(e.target.checked)} className="h-4 w-4" />
+              <span className="text-amber-900 font-medium">
+                Издай протокол за липса — {fmtKg(shortage)} придобити на цена 0
+              </span>
+            </label>
+            <div className="text-amber-700 text-xs">
+              Липсващото количество влиза в себестойността с 0 €, затова печалбата се изчислява само спрямо наличната част.
             </div>
           </div>
         )}
