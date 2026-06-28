@@ -45,8 +45,8 @@ export default function Dashboard() {
       ) : rows.length === 0 ? (
         <Empty text="Няма материали. Добавете материал от меню „Номенклатури“ или при въвеждане на доставка." />
       ) : (
-        <div className="card overflow-hidden">
-          <table className="w-full">
+        <div className="card overflow-x-auto">
+          <table className="w-full min-w-[640px]">
             <thead className="bg-slate-50">
               <tr>
                 <th className="th">Материал</th>

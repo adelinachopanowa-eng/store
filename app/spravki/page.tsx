@@ -6,7 +6,7 @@ import { MaterialBalance } from "@/lib/types";
 import { fmtKg, fmtLv, fmtPrice, fmtDate } from "@/lib/format";
 import { PageHeader, Loading, Stat } from "@/components/ui";
 
-type Report = "stock" | "deliveries" | "sales" | "to_invoice" | "unpaid";
+type Report = "stock" | "deliveries" | "sales" | "to_invoice" | "unpaid" | "audit";
 
 function toCSV(rows: Record<string, any>[]): string {
   if (!rows.length) return "";
@@ -77,6 +77,13 @@ export default function ReportsPage() {
         ...(del.data || []).map((x: any) => ({ ...x, _kind: "Доставка", _party: x.wh_suppliers?.name || x.supplier_name, _amount: x.total_value, _date: x.doc_date, _paid: x.paid })),
         ...(sal.data || []).map((x: any) => ({ ...x, _kind: "Продажба", _party: x.wh_suppliers?.name || x.buyer_name, _amount: x.sale_value, _date: x.doc_date, _paid: x.paid })),
       ]);
+    } else if (report === "audit") {
+      const { data: d } = await supabase
+        .from("wh_audit_log")
+        .select("*")
+        .order("at", { ascending: false })
+        .limit(500);
+      setData(d || []);
     }
     setLoading(false);
   }
@@ -136,6 +143,14 @@ export default function ReportsPage() {
         "Сума €": x._amount,
         Платено: x._paid ? "Да" : "Не",
       }));
+    else if (report === "audit")
+      rows = data.map((x) => ({
+        "Дата/час": fmtDate(x.at),
+        Документ: `${x.entity} ${x.doc_ref || ""}`.trim(),
+        Действие: x.action === "void" ? "Анулиране" : "Редакция",
+        Детайли: x.details || "",
+        Причина: x.reason || "",
+      }));
     download(`spravka_${report}_${today}.csv`, toCSV(rows));
   }
 
@@ -158,6 +173,7 @@ export default function ReportsPage() {
           ["sales", "Продажби и печалба"],
           ["to_invoice", "За фактуриране"],
           ["unpaid", "Неплатени"],
+          ["audit", "Корекции и анулирани"],
         ] as [Report, string][]).map(([v, l]) => (
           <button key={v} className={report === v ? "btn-primary" : "btn-secondary"} onClick={() => setReport(v)}>
             {l}
@@ -280,6 +296,29 @@ function ReportTable({ report, data }: { report: Report; data: any[] }) {
       </>
     );
   }
+  if (report === "audit") {
+    const voids = data.filter((x) => x.action === "void").length;
+    const edits = data.filter((x) => x.action === "edit").length;
+    return (
+      <>
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <Stat label="Редакции" value={String(edits)} color="amber" />
+          <Stat label="Анулирани документи" value={String(voids)} color="red" />
+        </div>
+        <Table
+          rightFrom={99}
+          head={["Дата/час", "Документ", "Действие", "Детайли", "Причина"]}
+          rows={data.map((x) => [
+            fmtDate(x.at),
+            `${x.entity} ${x.doc_ref || ""}`.trim(),
+            x.action === "void" ? "🗑 Анулиране" : "✏ Редакция",
+            x.details || "—",
+            x.reason || "—",
+          ])}
+        />
+      </>
+    );
+  }
   // unpaid
   const tot = data.reduce((s, x) => s + Number(x._amount || 0), 0);
   return (
@@ -314,8 +353,8 @@ function Table({
 }) {
   if (!rows.length) return <div className="card p-10 text-center text-slate-400 text-sm">Няма данни.</div>;
   return (
-    <div className="card overflow-hidden">
-      <table className="w-full">
+    <div className="card overflow-x-auto">
+      <table className="w-full min-w-[640px]">
         <thead className="bg-slate-50">
           <tr>
             {head.map((h, i) => (

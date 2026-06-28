@@ -46,8 +46,8 @@ export default function HistoryPage() {
       ) : rows.length === 0 ? (
         <Empty text="Няма записи." />
       ) : (
-        <div className="card overflow-hidden">
-          <table className="w-full">
+        <div className="card overflow-x-auto">
+          <table className="w-full min-w-[640px]">
             <thead className="bg-slate-50">
               <tr>
                 <th className="th">Дата</th>

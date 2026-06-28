@@ -40,6 +40,7 @@ export default function SalesPage() {
     const { data } = await supabase
       .from("wh_sales")
       .select("*, wh_materials(name), wh_suppliers(name)")
+      .eq("voided", false)
       .order("doc_date", { ascending: false })
       .limit(100);
     setList(data || []);
@@ -73,8 +74,8 @@ export default function SalesPage() {
       ) : list.length === 0 ? (
         <Empty text="Няма продажби." />
       ) : (
-        <div className="card overflow-hidden">
-          <table className="w-full">
+        <div className="card overflow-x-auto">
+          <table className="w-full min-w-[640px]">
             <thead className="bg-slate-50">
               <tr>
                 <th className="th">Дата</th>

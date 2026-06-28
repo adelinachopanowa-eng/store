@@ -33,6 +33,7 @@ export default function TransfersPage() {
     const { data } = await supabase
       .from("wh_transfers")
       .select("*, from_mat:from_material_id(name), to_mat:to_material_id(name)")
+      .eq("voided", false)
       .order("doc_date", { ascending: false })
       .limit(100);
     setList(data || []);
@@ -66,8 +67,8 @@ export default function TransfersPage() {
       ) : list.length === 0 ? (
         <Empty text="Няма пресортирания." />
       ) : (
-        <div className="card overflow-hidden">
-          <table className="w-full">
+        <div className="card overflow-x-auto">
+          <table className="w-full min-w-[640px]">
             <thead className="bg-slate-50">
               <tr>
                 <th className="th">Дата</th>

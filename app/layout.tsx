@@ -11,9 +11,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="bg">
       <body>
-        <div className="flex">
+        <div className="md:flex">
           <Nav />
-          <main className="flex-1 min-h-screen p-6 max-w-[1400px]">{children}</main>
+          <main className="flex-1 min-h-screen p-4 md:p-6 max-w-[1400px] w-full">{children}</main>
         </div>
       </body>
     </html>

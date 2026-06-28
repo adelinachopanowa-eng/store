@@ -100,8 +100,8 @@ function Materials() {
         <button className="btn-primary" onClick={openNew}>+ Нов материал</button>
       </div>
       {loading ? <Loading /> : rows.length === 0 ? <Empty text="Няма материали." /> : (
-        <div className="card overflow-hidden">
-          <table className="w-full">
+        <div className="card overflow-x-auto">
+          <table className="w-full min-w-[640px]">
             <thead className="bg-slate-50">
               <tr>
                 <th className="th">Код</th>
@@ -239,8 +239,8 @@ function Suppliers() {
         <button className="btn-primary" onClick={openNew}>+ Нов контрагент</button>
       </div>
       {loading ? <Loading /> : rows.length === 0 ? <Empty text="Няма контрагенти." /> : (
-        <div className="card overflow-hidden">
-          <table className="w-full">
+        <div className="card overflow-x-auto">
+          <table className="w-full min-w-[640px]">
             <thead className="bg-slate-50">
               <tr>
                 <th className="th">Ime</th>
