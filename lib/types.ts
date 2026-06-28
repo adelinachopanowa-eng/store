@@ -24,6 +24,15 @@ export type Material = {
   created_at: string;
 };
 
+export type ClientMaterial = {
+  id: string;
+  name: string;
+  code: string | null;
+  default_material_id: string | null;
+  active: boolean;
+  created_at: string;
+};
+
 export type MaterialBalance = {
   material_id: string;
   material_name: string;

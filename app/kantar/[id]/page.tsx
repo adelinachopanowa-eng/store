@@ -33,7 +33,7 @@ export default function WeighNotePrint() {
       const [del, comp] = await Promise.all([
         supabase
           .from("wh_deliveries")
-          .select("*, wh_suppliers(name, eik, egn, city, address), wh_delivery_allocations(gross_kg, tare_kg, net_kg, quantity_kg, wh_materials(name, code, waste_code))")
+          .select("*, wh_suppliers(name, eik, egn, city, address), wh_delivery_allocations(gross_kg, tare_kg, net_kg, quantity_kg, client_name, wh_materials(name))")
           .eq("id", id)
           .single(),
         supabase.from("wh_company").select("*").eq("id", 1).single(),
@@ -125,8 +125,7 @@ export default function WeighNotePrint() {
                 <tr key={i} className={i % 2 ? "bg-cream" : "bg-white"}>
                   <td className="px-3 py-2 border border-slate-300">{i + 1}</td>
                   <td className="px-3 py-2 border border-slate-300 font-medium">
-                    {a.wh_materials?.name || "—"}
-                    {a.wh_materials?.waste_code && <span className="text-xs text-slate-500"> · код {a.wh_materials.waste_code}</span>}
+                    {a.client_name || a.wh_materials?.name || "—"}
                   </td>
                   <td className="px-3 py-2 border border-slate-300 text-right tabular-nums">{kg(a.gross_kg)}</td>
                   <td className="px-3 py-2 border border-slate-300 text-right tabular-nums">{kg(a.tare_kg)}</td>

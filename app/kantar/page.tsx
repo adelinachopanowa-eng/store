@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { Supplier, Material } from "@/lib/types";
+import { Supplier, Material, ClientMaterial } from "@/lib/types";
 import { fmtKg, fmtLv, fmtDate } from "@/lib/format";
 import {
   PageHeader,
@@ -27,8 +27,8 @@ function toLocalInput(iso?: string | null) {
   return new Date(d.getTime() - off * 60000).toISOString().slice(0, 16);
 }
 
-type Line = { mat: ComboValue; gross: string; tare: string; price: string };
-const emptyLine = (): Line => ({ mat: { id: null, name: "" }, gross: "", tare: "", price: "" });
+type Line = { clientMat: ComboValue; mat: ComboValue; gross: string; tare: string; price: string };
+const emptyLine = (): Line => ({ clientMat: { id: null, name: "" }, mat: { id: null, name: "" }, gross: "", tare: "", price: "" });
 
 export default function WeighNotesPage() {
   const [list, setList] = useState<any[]>([]);
@@ -37,20 +37,23 @@ export default function WeighNotesPage() {
   const [editItem, setEditItem] = useState<any | null>(null);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
+  const [clientMaterials, setClientMaterials] = useState<ClientMaterial[]>([]);
 
   async function loadRefs() {
-    const [s, m] = await Promise.all([
+    const [s, m, c] = await Promise.all([
       supabase.from("wh_suppliers").select("*").eq("active", true).order("name"),
       supabase.from("wh_materials").select("*").eq("active", true).order("name"),
+      supabase.from("wh_client_materials").select("*").eq("active", true).order("name"),
     ]);
     setSuppliers((s.data as Supplier[]) || []);
     setMaterials((m.data as Material[]) || []);
+    setClientMaterials((c.data as ClientMaterial[]) || []);
   }
   async function loadList() {
     setLoading(true);
     const { data } = await supabase
       .from("wh_deliveries")
-      .select("*, wh_suppliers(name), wh_delivery_allocations(material_id, gross_kg, tare_kg, net_kg, unit_price, wh_materials(name))")
+      .select("*, wh_suppliers(name), wh_delivery_allocations(material_id, client_material_id, client_name, gross_kg, tare_kg, net_kg, unit_price, wh_materials(name))")
       .eq("is_weigh_note", true)
       .eq("voided", false)
       .order("weighed_at", { ascending: false })
@@ -98,7 +101,7 @@ export default function WeighNotesPage() {
             <tbody>
               {list.map((d) => {
                 const lines = d.wh_delivery_allocations || [];
-                const mats = lines.map((a: any) => a.wh_materials?.name).filter(Boolean);
+                const mats = lines.map((a: any) => a.client_name || a.wh_materials?.name).filter(Boolean);
                 const matLabel = mats.length <= 1 ? (mats[0] || "—") : `${mats[0]} +${mats.length - 1}`;
                 return (
                   <tr key={d.id} className="hover:bg-brand-50">
@@ -151,6 +154,7 @@ export default function WeighNotesPage() {
         editItem={editItem}
         suppliers={suppliers}
         materials={materials}
+        clientMaterials={clientMaterials}
         onSaved={() => { loadList(); loadRefs(); }}
       />
     </div>
@@ -163,6 +167,7 @@ function WeighModal({
   editItem,
   suppliers,
   materials,
+  clientMaterials,
   onSaved,
 }: {
   open: boolean;
@@ -170,6 +175,7 @@ function WeighModal({
   editItem: any | null;
   suppliers: Supplier[];
   materials: Material[];
+  clientMaterials: ClientMaterial[];
   onSaved: () => void;
 }) {
   const isEdit = !!editItem;
@@ -205,6 +211,7 @@ function WeighModal({
       setLines(
         al.length
           ? al.map((a) => ({
+              clientMat: { id: a.client_material_id || null, name: a.client_name || "" },
               mat: { id: a.material_id, name: a.wh_materials?.name || "" },
               gross: a.gross_kg != null ? String(a.gross_kg) : "",
               tare: a.tare_kg != null ? String(a.tare_kg) : "",
@@ -237,14 +244,31 @@ function WeighModal({
     setLines((prev) => prev.map((l, j) => (j === i ? { ...l, ...patch } : l)));
   }
 
+  // Избор на клиентско наименование → авто-попълва вътрешния материал от мапинга
+  function pickClient(i: number, v: ComboValue) {
+    const cm = v.id ? clientMaterials.find((c) => c.id === v.id) : undefined;
+    const def = cm?.default_material_id ? materials.find((m) => m.id === cm.default_material_id) : undefined;
+    setLines((prev) =>
+      prev.map((l, j) => {
+        if (j !== i) return l;
+        // попълва вътрешния само ако е празен или сме сменили към мапнат клиентски материал
+        const mat = def ? { id: def.id, name: def.name } : l.mat;
+        return { ...l, clientMat: v, mat };
+      })
+    );
+  }
+
   async function save() {
     setErr("");
-    if (lines.some((l) => !l.mat.name.trim())) return setErr("Изберете материал на всеки ред.");
+    if (lines.some((l) => !l.clientMat.name.trim())) return setErr("Въведете клиентско наименование на всеки ред.");
+    if (lines.some((l) => !l.mat.name.trim())) return setErr("Изберете вътрешна номенклатура на всеки ред.");
     if (lines.some((l) => netKg(l) <= 0)) return setErr("Нетото на всеки ред трябва да е положително (бруто минус тара).");
     setSaving(true);
     try {
       const weighedIso = weighedAt ? new Date(weighedAt).toISOString() : new Date().toISOString();
       const payloadLines = lines.map((l) => ({
+        client_material_id: l.clientMat.id,
+        client_material_name: l.clientMat.id ? null : l.clientMat.name.trim(),
         material_id: l.mat.id,
         material_name: l.mat.id ? null : l.mat.name.trim(),
         gross_kg: Number(l.gross) || 0,
@@ -326,41 +350,53 @@ function WeighModal({
             {lines.map((l, i) => {
               const nkg = netKg(l);
               return (
-                <div key={i} className="rounded-lg border border-slate-200 p-2">
-                  <div className="grid grid-cols-1 sm:grid-cols-[1fr_96px_96px_110px_28px] gap-2 items-end">
-                    <Field label={i === 0 ? "Материал" : ""}>
-                      <Combobox
-                        items={materials.map((m) => ({ id: m.id, name: m.name }))}
-                        value={l.mat}
-                        onChange={(v) => setLine(i, { mat: v })}
-                        placeholder="Материал"
-                      />
-                    </Field>
-                    <Field label={i === 0 ? "Бруто (кг)" : ""}>
-                      <input className="input" type="number" step="1" value={l.gross} onChange={(e) => setLine(i, { gross: e.target.value })} />
-                    </Field>
-                    <Field label={i === 0 ? "Тара (кг)" : ""}>
-                      <input className="input" type="number" step="1" value={l.tare} onChange={(e) => setLine(i, { tare: e.target.value })} />
-                    </Field>
-                    {isEdit ? (
-                      <Field label={i === 0 ? "Цена (€/т)" : ""}>
-                        <input className="input" type="number" step="0.01" value={l.price} onChange={(e) => setLine(i, { price: e.target.value })} placeholder="по-късно" />
+                <div key={i} className="rounded-lg border border-slate-200 p-2 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 flex-1">
+                      <Field label="Клиентско наименование (на бележката)">
+                        <Combobox
+                          items={clientMaterials.map((c) => ({ id: c.id, name: c.name }))}
+                          value={l.clientMat}
+                          onChange={(v) => pickClient(i, v)}
+                          placeholder="Клиентско наименование"
+                        />
                       </Field>
-                    ) : (
-                      <div className="text-sm text-slate-500 pb-2">{nkg > 0 ? `нето ${nkg.toLocaleString("bg-BG")} кг` : "—"}</div>
-                    )}
+                      <Field label="Вътрешна номенклатура (за склада)">
+                        <Combobox
+                          items={materials.map((m) => ({ id: m.id, name: m.name }))}
+                          value={l.mat}
+                          onChange={(v) => setLine(i, { mat: v })}
+                          placeholder="Вътрешен материал"
+                        />
+                      </Field>
+                    </div>
                     <button
                       type="button"
-                      className="text-slate-400 hover:text-red-600 pb-2 text-center"
+                      className="text-slate-400 hover:text-red-600 mt-7 px-1"
                       onClick={() => setLines(lines.length > 1 ? lines.filter((_, j) => j !== i) : lines)}
                       title="Премахни реда"
                     >
                       ×
                     </button>
                   </div>
-                  {isEdit && nkg > 0 && (
-                    <div className="text-xs text-slate-500 mt-1">нето {nkg.toLocaleString("bg-BG")} кг · {fmtKg(nkg / 1000)}</div>
-                  )}
+                  <div className="grid grid-cols-2 sm:grid-cols-[96px_96px_110px_1fr] gap-2 items-end">
+                    <Field label="Бруто (кг)">
+                      <input className="input" type="number" step="1" value={l.gross} onChange={(e) => setLine(i, { gross: e.target.value })} />
+                    </Field>
+                    <Field label="Тара (кг)">
+                      <input className="input" type="number" step="1" value={l.tare} onChange={(e) => setLine(i, { tare: e.target.value })} />
+                    </Field>
+                    {isEdit ? (
+                      <Field label="Цена (€/т)">
+                        <input className="input" type="number" step="0.01" value={l.price} onChange={(e) => setLine(i, { price: e.target.value })} placeholder="по-късно" />
+                      </Field>
+                    ) : (
+                      <div />
+                    )}
+                    <div className="text-sm text-slate-500 pb-2 text-right">
+                      {nkg > 0 ? `нето ${nkg.toLocaleString("bg-BG")} кг · ${fmtKg(nkg / 1000)}` : "—"}
+                    </div>
+                  </div>
                 </div>
               );
             })}

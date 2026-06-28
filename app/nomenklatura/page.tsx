@@ -2,26 +2,166 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { Material, Supplier } from "@/lib/types";
+import { Material, Supplier, ClientMaterial } from "@/lib/types";
 import { fmtPrice } from "@/lib/format";
 import { PageHeader, Loading, Empty, Modal, Field, FormGrid, FormActions, FormError } from "@/components/ui";
 
-type Tab = "materials" | "suppliers";
+type Tab = "materials" | "clients" | "suppliers";
 
 export default function NomenclaturePage() {
   const [tab, setTab] = useState<Tab>("materials");
   return (
     <div>
       <PageHeader title="Номенклатури" subtitle="База данни за бързо въвеждане" />
-      <div className="flex gap-2 mb-4">
+      <div className="flex flex-wrap gap-2 mb-4">
         <button className={tab === "materials" ? "btn-primary" : "btn-secondary"} onClick={() => setTab("materials")}>
-          Материали
+          Материали (вътрешни)
+        </button>
+        <button className={tab === "clients" ? "btn-primary" : "btn-secondary"} onClick={() => setTab("clients")}>
+          Клиентски наименования
         </button>
         <button className={tab === "suppliers" ? "btn-primary" : "btn-secondary"} onClick={() => setTab("suppliers")}>
           Контрагенти
         </button>
       </div>
-      {tab === "materials" ? <Materials /> : <Suppliers />}
+      {tab === "materials" ? <Materials /> : tab === "clients" ? <ClientMaterials /> : <Suppliers />}
+    </div>
+  );
+}
+
+// ─── Client materials (клиентска номенклатура) ───────────────────────────────
+
+function ClientMaterials() {
+  const [rows, setRows] = useState<ClientMaterial[]>([]);
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState(false);
+  const [editItem, setEditItem] = useState<ClientMaterial | null>(null);
+  const [f, setF] = useState({ name: "", code: "", default_material_id: "" });
+  const [err, setErr] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    const [c, m] = await Promise.all([
+      supabase.from("wh_client_materials").select("*").order("name"),
+      supabase.from("wh_materials").select("*").eq("active", true).order("name"),
+    ]);
+    setRows((c.data as ClientMaterial[]) || []);
+    setMaterials((m.data as Material[]) || []);
+    setLoading(false);
+  }
+  useEffect(() => { load(); }, []);
+
+  const matName = (id: string | null) => materials.find((m) => m.id === id)?.name || "—";
+
+  function openNew() {
+    setEditItem(null);
+    setF({ name: "", code: "", default_material_id: "" });
+    setErr("");
+    setOpen(true);
+  }
+  function openEdit(c: ClientMaterial) {
+    setEditItem(c);
+    setF({ name: c.name, code: c.code || "", default_material_id: c.default_material_id || "" });
+    setErr("");
+    setOpen(true);
+  }
+
+  async function save() {
+    if (!f.name.trim()) { setErr("Въведете наименование"); return; }
+    setSaving(true);
+    setErr("");
+    if (editItem) {
+      const { error } = await supabase.rpc("wh_update_client_material", {
+        p_id: editItem.id,
+        p_name: f.name.trim(),
+        p_code: f.code || "",
+        p_default_material_id: f.default_material_id || null,
+      });
+      setSaving(false);
+      if (error) return setErr(error.message);
+    } else {
+      const { error } = await supabase.from("wh_client_materials").insert({
+        name: f.name.trim(),
+        code: f.code || null,
+        default_material_id: f.default_material_id || null,
+      });
+      setSaving(false);
+      if (error) return setErr(error.message);
+    }
+    setOpen(false);
+    load();
+  }
+
+  return (
+    <div>
+      <div className="flex justify-end mb-3">
+        <button className="btn-primary" onClick={openNew}>+ Ново клиентско наименование</button>
+      </div>
+      <p className="text-sm text-slate-500 mb-3">
+        Това, което клиентът вижда на кантарната бележка. Всяко наименование сочи към вътрешен материал по подразбиране,
+        който се ползва за наличности и счетоводство.
+      </p>
+      {loading ? <Loading /> : rows.length === 0 ? <Empty text="Няма клиентски наименования." /> : (
+        <div className="card overflow-x-auto">
+          <table className="w-full min-w-[640px]">
+            <thead className="bg-slate-50">
+              <tr>
+                <th className="th">Клиентско наименование</th>
+                <th className="th">Код</th>
+                <th className="th">Вътрешна номенклатура (по подразбиране)</th>
+                <th className="th"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((c) => (
+                <tr key={c.id} className="hover:bg-slate-50">
+                  <td className="td font-medium text-slate-900">{c.name}</td>
+                  <td className="td">{c.code || "—"}</td>
+                  <td className="td">{matName(c.default_material_id)}</td>
+                  <td className="td">
+                    <button
+                      className="text-xs text-slate-500 hover:text-brand-600 px-2 py-1 rounded hover:bg-slate-100"
+                      onClick={() => openEdit(c)}
+                    >
+                      Редакция
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <Modal open={open} onClose={() => setOpen(false)} title={editItem ? "Редакция на клиентско наименование" : "Ново клиентско наименование"}>
+        <div className="space-y-4">
+          <Field label="Клиентско наименование" required>
+            <input className="input" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
+          </Field>
+          <FormGrid cols={2}>
+            <Field label="Код (към клиента)">
+              <input className="input" value={f.code} onChange={(e) => setF({ ...f, code: e.target.value })} />
+            </Field>
+            <Field label="Вътрешна номенклатура (по подразбиране)">
+              <select className="input" value={f.default_material_id} onChange={(e) => setF({ ...f, default_material_id: e.target.value })}>
+                <option value="">— изберете —</option>
+                {materials.map((m) => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
+            </Field>
+          </FormGrid>
+          <FormError msg={err} />
+          <FormActions>
+            <button className="btn-secondary" onClick={() => setOpen(false)}>Отказ</button>
+            <button className="btn-primary" onClick={save} disabled={saving}>
+              {saving ? "Запис…" : editItem ? "Запази промените" : "Запази"}
+            </button>
+          </FormActions>
+        </div>
+      </Modal>
     </div>
   );
 }
