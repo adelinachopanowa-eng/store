@@ -369,16 +369,17 @@ function DeliveryModal({
                 + Добави материал
               </button>
             </div>
-            <div className="grid grid-cols-[1fr_84px_104px_96px_32px] gap-2 px-1 pb-1 text-xs font-medium text-slate-400">
+            <div className="hidden sm:grid grid-cols-[1fr_84px_104px_96px_32px] gap-2 px-1 pb-1 text-xs font-medium text-slate-400">
               <div>Материал</div>
               <div>Вид</div>
               <div>Стойност</div>
               <div className="text-right">= т</div>
               <div></div>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-3 sm:space-y-2">
               {allocs.map((a, i) => (
-                <div key={i} className="grid grid-cols-[1fr_84px_104px_96px_32px] gap-2 items-center">
+                <div key={i} className="grid grid-cols-[72px_minmax(0,1fr)_auto_28px] sm:grid-cols-[1fr_84px_104px_96px_32px] gap-2 items-center rounded-lg border border-slate-100 p-2 sm:border-0 sm:p-0">
+                  <div className="col-span-full sm:col-span-1">
                   <Combobox
                     items={materials.map((m) => ({ id: m.material_id, name: m.material_name }))}
                     value={a.mat}
@@ -389,6 +390,7 @@ function DeliveryModal({
                     }}
                     placeholder="Материал"
                   />
+                  </div>
                   <select
                     className="input"
                     value={a.mode}

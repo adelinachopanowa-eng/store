@@ -38,15 +38,15 @@ export function Modal({
 }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 overflow-y-auto">
-      <div className={`card my-8 w-full ${wide ? "max-w-3xl" : "max-w-lg"}`}>
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-start justify-center bg-black/40 sm:p-4 overflow-y-auto">
+      <div className={`card w-full rounded-b-none sm:rounded-xl sm:my-8 max-h-[92vh] sm:max-h-none overflow-y-auto ${wide ? "max-w-3xl" : "max-w-lg"}`}>
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-5 py-3">
           <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 text-xl leading-none">
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 text-2xl leading-none -mr-1 p-1">
             ×
           </button>
         </div>
-        <div className="p-5">{children}</div>
+        <div className="p-4 sm:p-5">{children}</div>
       </div>
     </div>
   );
@@ -89,7 +89,13 @@ export function Field({
 }
 
 export function FormGrid({ children, cols = 2 }: { children: ReactNode; cols?: 1 | 2 | 3 | 4 }) {
-  const map = { 1: "grid-cols-1", 2: "grid-cols-2", 3: "grid-cols-3", 4: "grid-cols-4" };
+  // На телефон винаги 1 колона; от sm нагоре — заявените колони.
+  const map = {
+    1: "grid-cols-1",
+    2: "grid-cols-1 sm:grid-cols-2",
+    3: "grid-cols-1 sm:grid-cols-3",
+    4: "grid-cols-1 sm:grid-cols-2 md:grid-cols-4",
+  };
   return <div className={`grid ${map[cols]} gap-x-4 gap-y-4`}>{children}</div>;
 }
 
