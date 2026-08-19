@@ -79,7 +79,7 @@ export default function DeliveriesPage() {
         <Empty text="Няма въведени доставки." />
       ) : (
         <div className="card overflow-x-auto">
-          <table className="w-full min-w-[640px]">
+          <table className="w-full min-w-[640px] rtable">
             <thead className="bg-slate-50">
               <tr>
                 <th className="th">Скл. №</th>
@@ -97,22 +97,22 @@ export default function DeliveriesPage() {
             <tbody>
               {list.map((d) => (
                 <tr key={d.id} className={`hover:bg-slate-50 ${d.voided ? "opacity-50" : ""}`}>
-                  <td className="td font-semibold text-slate-700">{d.seq_no ?? "—"}</td>
-                  <td className="td whitespace-nowrap">{fmtDate(d.doc_date)}</td>
-                  <td className="td">{d.doc_number || "—"}</td>
-                  <td className="td">{d.wh_suppliers?.name || d.supplier_name || "—"}</td>
-                  <td className="td text-right">{fmtKg(d.net_quantity)}</td>
-                  <td className="td text-right">{d.unit_price != null ? fmtPrice(d.unit_price) : <span className="text-amber-500 text-xs">без цена</span>}</td>
-                  <td className="td text-right font-medium">{d.total_value != null ? fmtLv(d.total_value) : "—"}</td>
-                  <td className="td">
+                  <td data-label="Скл. №" className="td font-semibold text-slate-700">{d.seq_no ?? "—"}</td>
+                  <td data-label="Дата" className="td whitespace-nowrap">{fmtDate(d.doc_date)}</td>
+                  <td data-label="Документ №" className="td">{d.doc_number || "—"}</td>
+                  <td data-label="Доставчик" className="td">{d.wh_suppliers?.name || d.supplier_name || "—"}</td>
+                  <td data-label="Нето" className="td text-right">{fmtKg(d.net_quantity)}</td>
+                  <td data-label="Цена" className="td text-right">{d.unit_price != null ? fmtPrice(d.unit_price) : <span className="text-amber-500 text-xs">без цена</span>}</td>
+                  <td data-label="Стойност" className="td text-right font-medium">{d.total_value != null ? fmtLv(d.total_value) : "—"}</td>
+                  <td data-label="Фактура" className="td">
                     {d.needs_invoice && <InvoiceBadge invoiced={d.invoiced} number={d.invoice_number} />}
                   </td>
-                  <td className="td">
+                  <td data-label="Плащане" className="td">
                     <span className={`badge ${d.paid ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
                       {d.payment_method === "bank" ? "Банка" : "Брой"} · {d.paid ? "Платено" : "Не"}
                     </span>
                   </td>
-                  <td className="td">
+                  <td className="td rtable-actions">
                     {d.voided ? (
                       <VoidedBadge />
                     ) : (

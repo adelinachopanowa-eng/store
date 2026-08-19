@@ -47,7 +47,7 @@ export default function HistoryPage() {
         <Empty text="Няма записи." />
       ) : (
         <div className="card overflow-x-auto">
-          <table className="w-full min-w-[640px]">
+          <table className="w-full min-w-[640px] rtable">
             <thead className="bg-slate-50">
               <tr>
                 <th className="th">Дата</th>
@@ -65,21 +65,21 @@ export default function HistoryPage() {
                 const isIn = Number(r.quantity_kg) >= 0;
                 return (
                   <tr key={r.id} className="hover:bg-slate-50">
-                    <td className="td whitespace-nowrap">{fmtDate(r.entry_date)}</td>
-                    <td className="td">
+                    <td className="td whitespace-nowrap" data-label="Дата">{fmtDate(r.entry_date)}</td>
+                    <td className="td" data-label="Движение">
                       <span className={`badge ${isIn ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
                         {r.type_bg}
                       </span>
                     </td>
-                    <td className="td">{r.material_name || "—"}</td>
-                    <td className="td">{r.supplier_name || "—"}</td>
-                    <td className={`td text-right font-medium ${isIn ? "text-emerald-600" : "text-red-600"}`}>
+                    <td className="td" data-label="Материал">{r.material_name || "—"}</td>
+                    <td className="td" data-label="Контрагент">{r.supplier_name || "—"}</td>
+                    <td className={`td text-right font-medium ${isIn ? "text-emerald-600" : "text-red-600"}`} data-label="Кол-во">
                       {isIn ? "+" : ""}
                       {fmtKg(r.quantity_kg)}
                     </td>
-                    <td className="td text-right">{r.unit_price != null ? fmtPrice(r.unit_price) : "—"}</td>
-                    <td className="td text-right">{fmtLv(r.value)}</td>
-                    <td className="td text-slate-500">{r.note || "—"}</td>
+                    <td className="td text-right" data-label="Цена">{r.unit_price != null ? fmtPrice(r.unit_price) : "—"}</td>
+                    <td className="td text-right" data-label="Стойност">{fmtLv(r.value)}</td>
+                    <td className="td text-slate-500" data-label="Бележка">{r.note || "—"}</td>
                   </tr>
                 );
               })}

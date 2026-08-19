@@ -354,7 +354,7 @@ function Table({
   if (!rows.length) return <div className="card p-10 text-center text-slate-400 text-sm">Няма данни.</div>;
   return (
     <div className="card overflow-x-auto">
-      <table className="w-full min-w-[640px]">
+      <table className="w-full min-w-[640px] rtable">
         <thead className="bg-slate-50">
           <tr>
             {head.map((h, i) => (
@@ -368,7 +368,7 @@ function Table({
           {rows.map((r, i) => (
             <tr key={i} className="hover:bg-slate-50">
               {r.map((c, j) => (
-                <td key={j} className={`td ${j >= rightFrom ? "text-right" : ""}`}>
+                <td key={j} data-label={head[j] ?? ""} className={`td ${j >= rightFrom ? "text-right" : ""}`}>
                   {c}
                 </td>
               ))}

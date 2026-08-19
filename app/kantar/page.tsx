@@ -84,7 +84,7 @@ export default function WeighNotesPage() {
         <Empty text="Няма издадени кантарни бележки." />
       ) : (
         <div className="card overflow-x-auto">
-          <table className="w-full min-w-[760px]">
+          <table className="w-full min-w-[760px] rtable">
             <thead>
               <tr>
                 <th className="th">№</th>
@@ -105,15 +105,15 @@ export default function WeighNotesPage() {
                 const matLabel = mats.length <= 1 ? (mats[0] || "—") : `${mats[0]} +${mats.length - 1}`;
                 return (
                   <tr key={d.id} className="hover:bg-brand-50">
-                    <td className="td font-semibold text-brand-700">{d.seq_no ?? "—"}</td>
-                    <td className="td whitespace-nowrap">{fmtDate(d.weighed_at || d.doc_date)}</td>
-                    <td className="td font-medium">{d.vehicle_reg || "—"}</td>
-                    <td className="td">{d.wh_suppliers?.name || d.supplier_name || "—"}</td>
-                    <td className="td" title={mats.join(", ")}>{matLabel}</td>
-                    <td className="td text-right">{kgRaw(d.gross_kg)}</td>
-                    <td className="td text-right">{kgRaw(d.tare_kg)}</td>
-                    <td className="td text-right font-medium">{fmtKg(d.net_quantity)}</td>
-                    <td className="td">
+                    <td className="td font-semibold text-brand-700" data-label="№">{d.seq_no ?? "—"}</td>
+                    <td className="td whitespace-nowrap" data-label="Дата/час">{fmtDate(d.weighed_at || d.doc_date)}</td>
+                    <td className="td font-medium" data-label="Рег. №">{d.vehicle_reg || "—"}</td>
+                    <td className="td" data-label="Клиент">{d.wh_suppliers?.name || d.supplier_name || "—"}</td>
+                    <td className="td" data-label="Материали" title={mats.join(", ")}>{matLabel}</td>
+                    <td className="td text-right" data-label="Бруто">{kgRaw(d.gross_kg)}</td>
+                    <td className="td text-right" data-label="Тара">{kgRaw(d.tare_kg)}</td>
+                    <td className="td text-right font-medium" data-label="Нето">{fmtKg(d.net_quantity)}</td>
+                    <td className="td rtable-actions">
                       <div className="flex gap-1 items-center">
                         <Link
                           href={`/kantar/${d.id}`}

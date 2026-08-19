@@ -46,7 +46,7 @@ export default function Dashboard() {
         <Empty text="Няма материали. Добавете материал от меню „Номенклатури“ или при въвеждане на доставка." />
       ) : (
         <div className="card overflow-x-auto">
-          <table className="w-full min-w-[640px]">
+          <table className="w-full min-w-[640px] rtable">
             <thead className="bg-slate-50">
               <tr>
                 <th className="th">Материал</th>
@@ -58,10 +58,10 @@ export default function Dashboard() {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.material_id} className="hover:bg-slate-50">
-                  <td className="td font-medium text-slate-900">{r.material_name}</td>
-                  <td className="td text-right">{fmtKg(r.quantity_kg)}</td>
-                  <td className="td text-right font-medium">{fmtPrice(r.avg_price)}</td>
-                  <td className="td text-right">{fmtLv(r.total_value)}</td>
+                  <td className="td font-medium text-slate-900" data-label="Материал">{r.material_name}</td>
+                  <td className="td text-right" data-label="Наличност">{fmtKg(r.quantity_kg)}</td>
+                  <td className="td text-right font-medium" data-label="Средна цена">{fmtPrice(r.avg_price)}</td>
+                  <td className="td text-right" data-label="Стойност">{fmtLv(r.total_value)}</td>
                 </tr>
               ))}
             </tbody>

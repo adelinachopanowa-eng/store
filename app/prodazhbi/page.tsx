@@ -75,7 +75,7 @@ export default function SalesPage() {
         <Empty text="Няма продажби." />
       ) : (
         <div className="card overflow-x-auto">
-          <table className="w-full min-w-[640px]">
+          <table className="w-full min-w-[640px] rtable">
             <thead className="bg-slate-50">
               <tr>
                 <th className="th">Дата</th>
@@ -94,11 +94,11 @@ export default function SalesPage() {
             <tbody>
               {list.map((s) => (
                 <tr key={s.id} className={`hover:bg-slate-50 ${s.voided ? "opacity-50" : ""}`}>
-                  <td className="td whitespace-nowrap">{fmtDate(s.doc_date)}</td>
-                  <td className="td">{s.doc_number || "—"}</td>
-                  <td className="td">{s.wh_materials?.name || "—"}</td>
-                  <td className="td">{s.wh_suppliers?.name || s.buyer_name || "—"}</td>
-                  <td className="td text-right">
+                  <td className="td whitespace-nowrap" data-label="Дата">{fmtDate(s.doc_date)}</td>
+                  <td className="td" data-label="№">{s.doc_number || "—"}</td>
+                  <td className="td" data-label="Материал">{s.wh_materials?.name || "—"}</td>
+                  <td className="td" data-label="Купувач">{s.wh_suppliers?.name || s.buyer_name || "—"}</td>
+                  <td className="td text-right" data-label="Кол-во">
                     {fmtKg(s.quantity_kg)}
                     {Number(s.shortage_qty) > 0 && (
                       <span className="ml-1 badge bg-rose-100 text-rose-700" title={`Протокол за липса: ${fmtKg(s.shortage_qty)}`}>
@@ -106,20 +106,20 @@ export default function SalesPage() {
                       </span>
                     )}
                   </td>
-                  <td className="td text-right">{fmtPrice(s.avg_cost)}</td>
-                  <td className="td text-right">
+                  <td className="td text-right" data-label="Себест.">{fmtPrice(s.avg_cost)}</td>
+                  <td className="td text-right" data-label="Прод. цена">
                     {s.unit_price != null ? fmtPrice(s.unit_price) : <span className="text-amber-500 text-xs">без цена</span>}
                   </td>
-                  <td className="td text-right font-medium">{s.sale_value != null ? fmtLv(s.sale_value) : "—"}</td>
-                  <td className="td">
+                  <td className="td text-right font-medium" data-label="Приход">{s.sale_value != null ? fmtLv(s.sale_value) : "—"}</td>
+                  <td className="td" data-label="Фактура">
                     {s.needs_invoice && <InvoiceBadge invoiced={s.invoiced} number={s.invoice_number} />}
                   </td>
-                  <td className="td">
+                  <td className="td" data-label="Плащане">
                     <span className={`badge ${s.paid ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
                       {s.payment_method === "bank" ? "Банка" : "Брой"} · {s.paid ? "Платено" : "Не"}
                     </span>
                   </td>
-                  <td className="td">
+                  <td className="td rtable-actions">
                     {s.voided ? (
                       <VoidedBadge />
                     ) : (

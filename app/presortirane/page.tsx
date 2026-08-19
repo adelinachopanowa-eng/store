@@ -68,7 +68,7 @@ export default function TransfersPage() {
         <Empty text="Няма пресортирания." />
       ) : (
         <div className="card overflow-x-auto">
-          <table className="w-full min-w-[640px]">
+          <table className="w-full min-w-[640px] rtable">
             <thead className="bg-slate-50">
               <tr>
                 <th className="th">Дата</th>
@@ -84,14 +84,14 @@ export default function TransfersPage() {
             <tbody>
               {list.map((t) => (
                 <tr key={t.id} className={`hover:bg-slate-50 ${t.voided ? "opacity-50" : ""}`}>
-                  <td className="td whitespace-nowrap">{fmtDate(t.doc_date)}</td>
-                  <td className="td">{t.from_mat?.name || "—"}</td>
-                  <td className="td">{t.to_mat?.name || "—"}</td>
-                  <td className="td text-right">{fmtKg(t.quantity_kg)}</td>
-                  <td className="td text-right">{fmtPrice(t.avg_cost)}</td>
-                  <td className="td text-right">{fmtLv(t.value)}</td>
-                  <td className="td text-slate-500">{t.note || "—"}</td>
-                  <td className="td">
+                  <td className="td whitespace-nowrap" data-label="Дата">{fmtDate(t.doc_date)}</td>
+                  <td className="td" data-label="От материал">{t.from_mat?.name || "—"}</td>
+                  <td className="td" data-label="Към материал">{t.to_mat?.name || "—"}</td>
+                  <td className="td text-right" data-label="Кол-во">{fmtKg(t.quantity_kg)}</td>
+                  <td className="td text-right" data-label="Ср. цена">{fmtPrice(t.avg_cost)}</td>
+                  <td className="td text-right" data-label="Стойност">{fmtLv(t.value)}</td>
+                  <td className="td text-slate-500" data-label="Бележка">{t.note || "—"}</td>
+                  <td className="td rtable-actions">
                     {t.voided ? (
                       <VoidedBadge />
                     ) : (

@@ -105,7 +105,7 @@ function ClientMaterials() {
       </p>
       {loading ? <Loading /> : rows.length === 0 ? <Empty text="Няма клиентски наименования." /> : (
         <div className="card overflow-x-auto">
-          <table className="w-full min-w-[640px]">
+          <table className="w-full min-w-[640px] rtable">
             <thead className="bg-slate-50">
               <tr>
                 <th className="th">Клиентско наименование</th>
@@ -117,10 +117,10 @@ function ClientMaterials() {
             <tbody>
               {rows.map((c) => (
                 <tr key={c.id} className="hover:bg-slate-50">
-                  <td className="td font-medium text-slate-900">{c.name}</td>
-                  <td className="td">{c.code || "—"}</td>
-                  <td className="td">{matName(c.default_material_id)}</td>
-                  <td className="td">
+                  <td className="td font-medium text-slate-900" data-label="Клиентско наименование">{c.name}</td>
+                  <td className="td" data-label="Код">{c.code || "—"}</td>
+                  <td className="td" data-label="Вътрешна номенклатура (по подразбиране)">{matName(c.default_material_id)}</td>
+                  <td className="td rtable-actions">
                     <button
                       className="text-xs text-slate-500 hover:text-brand-600 px-2 py-1 rounded hover:bg-slate-100"
                       onClick={() => openEdit(c)}
@@ -241,7 +241,7 @@ function Materials() {
       </div>
       {loading ? <Loading /> : rows.length === 0 ? <Empty text="Няма материали." /> : (
         <div className="card overflow-x-auto">
-          <table className="w-full min-w-[640px]">
+          <table className="w-full min-w-[640px] rtable">
             <thead className="bg-slate-50">
               <tr>
                 <th className="th">Код</th>
@@ -255,12 +255,12 @@ function Materials() {
             <tbody>
               {rows.map((m) => (
                 <tr key={m.id} className="hover:bg-slate-50">
-                  <td className="td">{m.code || "—"}</td>
-                  <td className="td font-medium text-slate-900">{m.name}</td>
-                  <td className="td">{m.waste_code || "—"}</td>
-                  <td className="td">{m.unit}</td>
-                  <td className="td text-right">{m.default_price != null ? fmtPrice(m.default_price) : "—"}</td>
-                  <td className="td">
+                  <td className="td" data-label="Код">{m.code || "—"}</td>
+                  <td className="td font-medium text-slate-900" data-label="Наименование">{m.name}</td>
+                  <td className="td" data-label="Код отпадък">{m.waste_code || "—"}</td>
+                  <td className="td" data-label="Мярка">{m.unit}</td>
+                  <td className="td text-right" data-label="Ориент. цена">{m.default_price != null ? fmtPrice(m.default_price) : "—"}</td>
+                  <td className="td rtable-actions">
                     <button
                       className="text-xs text-slate-500 hover:text-brand-600 px-2 py-1 rounded hover:bg-slate-100"
                       onClick={() => openEdit(m)}
@@ -380,7 +380,7 @@ function Suppliers() {
       </div>
       {loading ? <Loading /> : rows.length === 0 ? <Empty text="Няма контрагенти." /> : (
         <div className="card overflow-x-auto">
-          <table className="w-full min-w-[640px]">
+          <table className="w-full min-w-[640px] rtable">
             <thead className="bg-slate-50">
               <tr>
                 <th className="th">Ime</th>
@@ -395,13 +395,13 @@ function Suppliers() {
             <tbody>
               {rows.map((s) => (
                 <tr key={s.id} className="hover:bg-slate-50">
-                  <td className="td font-medium text-slate-900">{s.name}</td>
-                  <td className="td">{kindBg[s.kind]}</td>
-                  <td className="td">{s.eik || "—"}</td>
-                  <td className="td">{s.egn || "—"}</td>
-                  <td className="td">{s.city || "—"}</td>
-                  <td className="td">{s.phone || "—"}</td>
-                  <td className="td">
+                  <td className="td font-medium text-slate-900" data-label="Ime">{s.name}</td>
+                  <td className="td" data-label="Тип">{kindBg[s.kind]}</td>
+                  <td className="td" data-label="ЕИК">{s.eik || "—"}</td>
+                  <td className="td" data-label="ЕГН">{s.egn || "—"}</td>
+                  <td className="td" data-label="Град">{s.city || "—"}</td>
+                  <td className="td" data-label="Телефон">{s.phone || "—"}</td>
+                  <td className="td rtable-actions">
                     <button
                       className="text-xs text-slate-500 hover:text-brand-600 px-2 py-1 rounded hover:bg-slate-100"
                       onClick={() => openEdit(s)}
