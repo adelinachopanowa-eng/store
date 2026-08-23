@@ -20,6 +20,7 @@ export type Material = {
   waste_code: string | null;
   unit: string;
   default_price: number | null;
+  sell_price: number | null;
   active: boolean;
   created_at: string;
 };

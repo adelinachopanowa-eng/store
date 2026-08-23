@@ -11,6 +11,7 @@ const links = [
   { href: "/prodazhbi", label: "Продажби", icon: "📤" },
   { href: "/presortirane", label: "Пресортиране", icon: "🔀" },
   { href: "/nomenklatura", label: "Номенклатури", icon: "📚" },
+  { href: "/pechalba", label: "Печалба", icon: "💰" },
   { href: "/istoria", label: "История", icon: "🕓" },
   { href: "/spravki", label: "Справки", icon: "📈" },
   { href: "/nastroyki", label: "Настройки", icon: "⚙️" },
