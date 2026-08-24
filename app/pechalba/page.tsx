@@ -32,8 +32,10 @@ export default function ProfitPage() {
 
       {tab === "stock" ? (
         <StockView />
+      ) : tab === "by_material" ? (
+        <SalesReport groupBy="material" />
       ) : (
-        <SalesReport groupBy={tab === "by_material" ? "material" : "counterparty"} />
+        <PurchasesBySupplier />
       )}
     </div>
   );
@@ -412,4 +414,198 @@ function SalesReport({ groupBy }: { groupBy: "material" | "counterparty" }) {
 // Помощник за групиране на няколко <tr> без обвиващ елемент
 function FragmentRows({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Таб 3 — По контрагенти (доставчици): закупувания + потенциална печалба
+// ══════════════════════════════════════════════════════════════════════════════
+type PSub = { key: string; label: string; qty: number; cost: number; pRev: number; pCost: number };
+type PGroup = { key: string; label: string; qty: number; cost: number; pRev: number; pCost: number; subs: PSub[] };
+type PSortKey = "profit" | "cost" | "qty" | "margin";
+
+function PurchasesBySupplier() {
+  const today = new Date().toISOString().slice(0, 10);
+  const [from, setFrom] = useState(daysAgo(30));
+  const [to, setTo] = useState(today);
+  const [deliveries, setDeliveries] = useState<any[]>([]);
+  const [sellMap, setSellMap] = useState<Record<string, number | null>>({});
+  const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [sortKey, setSortKey] = useState<PSortKey>("profit");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+  async function load() {
+    setLoading(true);
+    const [dRes, mRes] = await Promise.all([
+      supabase
+        .from("wh_deliveries")
+        .select("*, wh_suppliers(name), wh_delivery_allocations(material_id, quantity_kg, value, wh_materials(name))")
+        .eq("voided", false)
+        .gte("doc_date", isoStart(from))
+        .lte("doc_date", isoEnd(to))
+        .order("doc_date", { ascending: false }),
+      supabase.from("wh_materials").select("id, sell_price"),
+    ]);
+    const sm: Record<string, number | null> = {};
+    for (const m of (mRes.data as any[]) || []) sm[m.id] = m.sell_price != null ? Number(m.sell_price) : null;
+    setSellMap(sm);
+    setDeliveries(dRes.data || []);
+    setExpanded(new Set());
+    setLoading(false);
+  }
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
+
+  const groups = useMemo(() => {
+    const map = new Map<string, PGroup>();
+    for (const d of deliveries) {
+      const gKey = d.supplier_id ? "sup:" + d.supplier_id : "name:" + (d.supplier_name || "—");
+      const gLabel = d.wh_suppliers?.name || d.supplier_name || "—";
+      const dUnit = d.unit_price != null ? Number(d.unit_price) : null;
+      const allocs = d.wh_delivery_allocations || [];
+      for (const a of allocs) {
+        const qty = Number(a.quantity_kg || 0);
+        // изкупна стойност: alloc.value, иначе delivery.unit_price × qty
+        const cost = a.value != null ? Number(a.value) : dUnit != null ? dUnit * qty : null;
+        if (cost == null) continue; // само с цена
+        const sell = a.material_id != null ? sellMap[a.material_id] ?? null : null;
+        const pRev = sell != null ? qty * sell : 0;
+        const pCost = sell != null ? cost : 0;
+        const sKey = a.material_id || "—";
+        const sLabel = a.wh_materials?.name || "—";
+        let g = map.get(gKey);
+        if (!g) { g = { key: gKey, label: gLabel, qty: 0, cost: 0, pRev: 0, pCost: 0, subs: [] }; map.set(gKey, g); }
+        g.qty += qty; g.cost += cost; g.pRev += pRev; g.pCost += pCost;
+        let sub = g.subs.find((x) => x.key === sKey);
+        if (!sub) { sub = { key: sKey, label: sLabel, qty: 0, cost: 0, pRev: 0, pCost: 0 }; g.subs.push(sub); }
+        sub.qty += qty; sub.cost += cost; sub.pRev += pRev; sub.pCost += pCost;
+      }
+    }
+    return Array.from(map.values());
+  }, [deliveries, sellMap]);
+
+  const profitOf = (x: { pRev: number; pCost: number }) => x.pRev - x.pCost;
+  const marginOf = (x: { pRev: number; pCost: number }) => (x.pRev ? ((x.pRev - x.pCost) / x.pRev) * 100 : null);
+  const avgPrice = (x: { qty: number; cost: number }) => (x.qty ? x.cost / x.qty : 0);
+
+  const sortVal = (x: PGroup | PSub) =>
+    sortKey === "qty" ? x.qty : sortKey === "cost" ? x.cost : sortKey === "margin" ? (marginOf(x) ?? -Infinity) : profitOf(x);
+
+  const sorted = useMemo(() => {
+    const arr = [...groups];
+    arr.sort((a, b) => (sortVal(a) - sortVal(b)) * (sortDir === "asc" ? 1 : -1));
+    for (const g of arr) g.subs.sort((a, b) => (sortVal(a) - sortVal(b)) * (sortDir === "asc" ? 1 : -1));
+    return arr;
+    // eslint-disable-next-line
+  }, [groups, sortKey, sortDir]);
+
+  const totals = useMemo(() => {
+    let qty = 0, cost = 0, pRev = 0, pCost = 0;
+    for (const g of groups) { qty += g.qty; cost += g.cost; pRev += g.pRev; pCost += g.pCost; }
+    return { qty, cost, pRev, pCost, profit: pRev - pCost, margin: pRev ? ((pRev - pCost) / pRev) * 100 : null };
+  }, [groups]);
+
+  function toggleSort(k: PSortKey) {
+    if (sortKey === k) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortKey(k); setSortDir("desc"); }
+  }
+  function toggleExpand(k: string) {
+    setExpanded((s) => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n; });
+  }
+  const arrow = (k: PSortKey) => (sortKey === k ? (sortDir === "asc" ? " ▲" : " ▼") : "");
+
+  return (
+    <div>
+      <div className="card p-3 mb-4 flex flex-wrap items-end gap-3">
+        <div>
+          <label className="label">От дата</label>
+          <input type="date" className="input" value={from} onChange={(e) => setFrom(e.target.value)} />
+        </div>
+        <div>
+          <label className="label">До дата</label>
+          <input type="date" className="input" value={to} onChange={(e) => setTo(e.target.value)} />
+        </div>
+        <button className="btn-primary" onClick={load}>Покажи</button>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <Stat label="Общо закупено" value={fmtKg(totals.qty)} color="blue" />
+        <Stat label="Стойност на покупките" value={fmtLv(totals.cost)} color="slate" />
+        <Stat label="Потенциална печалба" value={money(totals.profit)} color={totals.profit >= 0 ? "green" : "red"} sub="при текущите продажни цени" />
+        <Stat label="Марж" value={totals.margin == null ? "—" : `${totals.margin.toFixed(1)} %`} color="amber" />
+      </div>
+
+      {loading ? (
+        <Loading />
+      ) : sorted.length === 0 ? (
+        <Empty text="Няма доставки с изкупна цена за избрания период." />
+      ) : (
+        <div className="card overflow-x-auto">
+          <table className="w-full min-w-[820px] rtable">
+            <thead className="bg-slate-50">
+              <tr>
+                <th className="th">Доставчик</th>
+                <th className="th text-right cursor-pointer select-none" onClick={() => toggleSort("qty")}>Количество{arrow("qty")}</th>
+                <th className="th text-right cursor-pointer select-none" onClick={() => toggleSort("cost")}>Стойност (покупка){arrow("cost")}</th>
+                <th className="th text-right">Ср. изкупна цена</th>
+                <th className="th text-right cursor-pointer select-none" onClick={() => toggleSort("profit")}>Потенц. печалба{arrow("profit")}</th>
+                <th className="th text-right cursor-pointer select-none" onClick={() => toggleSort("margin")}>Марж{arrow("margin")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((g) => {
+                const gp = profitOf(g);
+                const gm = marginOf(g);
+                const isOpen = expanded.has(g.key);
+                return (
+                  <FragmentRows key={g.key}>
+                    <tr className="hover:bg-slate-50 cursor-pointer" onClick={() => toggleExpand(g.key)}>
+                      <td className="td font-medium text-slate-900" data-label="Доставчик">
+                        <span className="text-slate-400 mr-1">{isOpen ? "▾" : "▸"}</span>{g.label}
+                      </td>
+                      <td className="td text-right" data-label="Количество">{fmtKg(g.qty)}</td>
+                      <td className="td text-right" data-label="Стойност (покупка)">{fmtLv(g.cost)}</td>
+                      <td className="td text-right" data-label="Ср. изкупна цена">{fmtPrice(avgPrice(g))}</td>
+                      <td className={`td text-right font-semibold ${profitCls(g.pRev ? gp : null)}`} data-label="Потенц. печалба">{g.pRev ? money(gp) : "—"}</td>
+                      <td className={`td text-right ${profitCls(gm)}`} data-label="Марж">{gm == null ? "—" : `${gm.toFixed(1)} %`}</td>
+                    </tr>
+                    {isOpen &&
+                      g.subs.map((sub) => {
+                        const sp = profitOf(sub);
+                        const sm = marginOf(sub);
+                        return (
+                          <tr key={g.key + "|" + sub.key} className="bg-slate-50/60 text-sm">
+                            <td className="td pl-8 text-slate-600" data-label="Материал">↳ {sub.label}</td>
+                            <td className="td text-right text-slate-600" data-label="Количество">{fmtKg(sub.qty)}</td>
+                            <td className="td text-right text-slate-600" data-label="Стойност (покупка)">{fmtLv(sub.cost)}</td>
+                            <td className="td text-right text-slate-600" data-label="Ср. изкупна цена">{fmtPrice(avgPrice(sub))}</td>
+                            <td className={`td text-right ${profitCls(sub.pRev ? sp : null)}`} data-label="Потенц. печалба">{sub.pRev ? money(sp) : "—"}</td>
+                            <td className={`td text-right ${profitCls(sm)}`} data-label="Марж">{sm == null ? "—" : `${sm.toFixed(1)} %`}</td>
+                          </tr>
+                        );
+                      })}
+                  </FragmentRows>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr className="bg-slate-50 font-semibold">
+                <td className="td">Общо</td>
+                <td className="td text-right">{fmtKg(totals.qty)}</td>
+                <td className="td text-right">{fmtLv(totals.cost)}</td>
+                <td className="td text-right">{fmtPrice(avgPrice(totals))}</td>
+                <td className={`td text-right ${profitCls(totals.pRev ? totals.profit : null)}`}>{totals.pRev ? money(totals.profit) : "—"}</td>
+                <td className="td text-right">{totals.margin == null ? "—" : `${totals.margin.toFixed(1)} %`}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+
+      <p className="text-xs text-slate-400 mt-3">
+        Справка по доставчик (от кого купуваме). Потенциална печалба = закупено количество × (текуща
+        продажна цена − изкупна цена), само за материали с въведена продажна цена. Доставки/кантарни
+        бележки без изкупна цена не се включват. Клик върху ред разгъва материалите; клик върху заглавие сортира.
+      </p>
+    </div>
+  );
 }
