@@ -22,6 +22,21 @@ import Combobox, { ComboValue } from "@/components/Combobox";
 type Alloc = { mat: ComboValue; mode: "pct" | "kg"; amount: string };
 const emptyMat: ComboValue = { id: null, name: "" };
 
+// Кратко описание на закупените материали по доставка
+function matLabel(d: any) {
+  const names: string[] = (d.wh_delivery_allocations || [])
+    .map((a: any) => a.wh_materials?.name || a.client_name)
+    .filter(Boolean);
+  if (!names.length) return "—";
+  const uniq = Array.from(new Set(names));
+  return (
+    <span title={uniq.join(", ")}>
+      {uniq[0]}
+      {uniq.length > 1 && <span className="text-slate-400"> +{uniq.length - 1}</span>}
+    </span>
+  );
+}
+
 export default function DeliveriesPage() {
   const [list, setList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,7 +58,7 @@ export default function DeliveriesPage() {
     setLoading(true);
     const { data } = await supabase
       .from("wh_deliveries")
-      .select("*, wh_suppliers(name)")
+      .select("*, wh_suppliers(name), wh_delivery_allocations(material_id, quantity_kg, client_name, wh_materials(name))")
       .eq("voided", false)
       .order("doc_date", { ascending: false })
       .limit(100);
@@ -86,6 +101,7 @@ export default function DeliveriesPage() {
                 <th className="th">Дата</th>
                 <th className="th">Документ №</th>
                 <th className="th">Доставчик</th>
+                <th className="th">Материал</th>
                 <th className="th text-right">Нето</th>
                 <th className="th text-right">Цена</th>
                 <th className="th text-right">Стойност</th>
@@ -101,6 +117,7 @@ export default function DeliveriesPage() {
                   <td data-label="Дата" className="td whitespace-nowrap">{fmtDate(d.doc_date)}</td>
                   <td data-label="Документ №" className="td">{d.doc_number || "—"}</td>
                   <td data-label="Доставчик" className="td">{d.wh_suppliers?.name || d.supplier_name || "—"}</td>
+                  <td data-label="Материал" className="td">{matLabel(d)}</td>
                   <td data-label="Нето" className="td text-right">{fmtKg(d.net_quantity)}</td>
                   <td data-label="Цена" className="td text-right">{d.unit_price != null ? fmtPrice(d.unit_price) : <span className="text-amber-500 text-xs">без цена</span>}</td>
                   <td data-label="Стойност" className="td text-right font-medium">{d.total_value != null ? fmtLv(d.total_value) : "—"}</td>

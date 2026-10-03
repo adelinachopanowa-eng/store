@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { MaterialBalance } from "@/lib/types";
 import { fmtKg, fmtLv, fmtPrice, fmtDate } from "@/lib/format";
@@ -197,12 +197,12 @@ export default function ReportsPage() {
         </div>
       )}
 
-      {loading ? <Loading /> : <ReportTable report={report} data={data} />}
+      {loading ? <Loading /> : <ReportTable report={report} data={data} onChanged={load} />}
     </div>
   );
 }
 
-function ReportTable({ report, data }: { report: Report; data: any[] }) {
+function ReportTable({ report, data, onChanged }: { report: Report; data: any[]; onChanged: () => void }) {
   if (report === "stock") {
     const totVal = data.reduce((s, r) => s + Number(r.total_value), 0);
     const totQty = data.reduce((s, r) => s + Number(r.quantity_kg), 0);
@@ -320,6 +320,29 @@ function ReportTable({ report, data }: { report: Report; data: any[] }) {
     );
   }
   // unpaid
+  return <UnpaidReport data={data} onChanged={onChanged} />;
+}
+
+function UnpaidReport({ data, onChanged }: { data: any[]; onChanged: () => void }) {
+  const [saving, setSaving] = useState<string | null>(null);
+  const [err, setErr] = useState("");
+
+  async function markPaid(x: any) {
+    const table = x._kind === "Доставка" ? "wh_deliveries" : "wh_sales";
+    setSaving(x.id);
+    setErr("");
+    const { error } = await supabase
+      .from(table)
+      .update({ paid: true, paid_at: new Date().toISOString() })
+      .eq("id", x.id);
+    setSaving(null);
+    if (error) {
+      setErr(error.message);
+      return;
+    }
+    onChanged();
+  }
+
   const tot = data.reduce((s, x) => s + Number(x._amount || 0), 0);
   return (
     <>
@@ -327,15 +350,24 @@ function ReportTable({ report, data }: { report: Report; data: any[] }) {
         <Stat label="Брой неплатени" value={String(data.length)} color="amber" />
         <Stat label="Обща сума" value={fmtLv(tot)} color="red" />
       </div>
+      {err && <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 border border-red-200 mb-3">{err}</div>}
       <Table
         rightFrom={3}
-        head={["Тип", "Дата", "Контрагент", "Сума", "Плащане"]}
+        head={["Тип", "Дата", "Контрагент", "Сума", "Плащане", ""]}
         rows={data.map((x) => [
           x._kind,
           fmtDate(x.doc_date),
           x._party || "—",
           fmtLv(x._amount),
           x.payment_method === "bank" ? "Банка" : "Брой",
+          <button
+            key="pay"
+            className="btn-primary text-xs px-3 py-1"
+            disabled={saving === x.id}
+            onClick={() => markPaid(x)}
+          >
+            {saving === x.id ? "Запис…" : "✓ Платено"}
+          </button>,
         ])}
       />
     </>
@@ -348,7 +380,7 @@ function Table({
   rightFrom = 3,
 }: {
   head: string[];
-  rows: (string | number)[][];
+  rows: ReactNode[][];
   rightFrom?: number;
 }) {
   if (!rows.length) return <div className="card p-10 text-center text-slate-400 text-sm">Няма данни.</div>;
