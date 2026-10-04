@@ -62,9 +62,11 @@ export default function Dashboard() {
       ) : inStock.length === 0 ? (
         <Empty text="Няма материали с наличност в момента." />
       ) : (
-        <div className="card overflow-hidden">
+        <>
+        {/* ─── Десктоп: таблица ─── */}
+        <div className="card overflow-hidden hidden sm:block">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] rtable">
+            <table className="w-full min-w-[640px]">
               <thead>
                 <tr>
                   <th className="th">Материал</th>
@@ -119,6 +121,44 @@ export default function Dashboard() {
             </table>
           </div>
         </div>
+
+        {/* ─── Телефон: компактен списък без повтарящи се етикети ─── */}
+        <div className="card overflow-hidden sm:hidden">
+          <ul className="divide-y divide-slate-100">
+            {inStock.map((r) => {
+              const val = Number(r.total_value);
+              const share = totalVal > 0 ? (val / totalVal) * 100 : 0;
+              return (
+                <li key={r.material_id} className="relative px-3 py-2.5">
+                  {/* фонова лента = дял от складовата стойност */}
+                  <div
+                    className="absolute inset-y-0 left-0 bg-brand-50"
+                    style={{ width: `${share}%` }}
+                    aria-hidden
+                  />
+                  <div className="relative flex items-baseline justify-between gap-3">
+                    <span className="font-medium text-slate-900 truncate">{r.material_name}</span>
+                    <span className="font-semibold text-slate-900 tabular-nums shrink-0">{fmtLv(val)}</span>
+                  </div>
+                  <div className="relative flex items-baseline justify-between gap-3 mt-0.5 text-xs text-slate-500">
+                    <span className="tabular-nums">
+                      {fmtKg(r.quantity_kg)} <span className="text-slate-300">·</span> {fmtPrice(r.avg_price)}
+                    </span>
+                    <span className="tabular-nums text-slate-400 shrink-0">{share.toFixed(1)}%</span>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="flex items-baseline justify-between gap-3 px-3 py-2.5 bg-slate-50 border-t-2 border-slate-200">
+            <span className="font-semibold text-slate-700">Общо</span>
+            <span className="text-right">
+              <span className="block font-bold text-brand-700 tabular-nums">{fmtLv(totalVal)}</span>
+              <span className="block text-xs text-slate-500 tabular-nums">{fmtKg(totalQty)}</span>
+            </span>
+          </div>
+        </div>
+        </>
       )}
     </div>
   );
