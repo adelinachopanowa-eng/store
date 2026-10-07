@@ -428,7 +428,7 @@ function DeliveryModal({
             </div>
             <div className="space-y-3 sm:space-y-2">
               {allocs.map((a, i) => (
-                <div key={i} className="grid grid-cols-[72px_minmax(0,1fr)_auto_28px] sm:grid-cols-[1fr_84px_104px_96px_32px] gap-2 items-center rounded-lg border border-slate-100 p-2 sm:border-0 sm:p-0">
+                <div key={i} className="grid grid-cols-[72px_minmax(0,1fr)_minmax(0,auto)_28px] sm:grid-cols-[1fr_84px_104px_96px_32px] gap-2 items-center rounded-lg border border-slate-100 p-2 sm:border-0 sm:p-0">
                   <div className="col-span-full sm:col-span-1">
                   <MaterialPicker
                     all={materials.map((m) => ({ id: m.material_id, name: m.material_name }))}
@@ -465,7 +465,7 @@ function DeliveryModal({
                       setAllocs(c);
                     }}
                   />
-                  <div className="text-sm text-slate-500 text-right">{fmtKg(allocKg[i])}</div>
+                  <div className="min-w-0 truncate text-sm text-slate-500 text-right tabular-nums">{fmtKg(allocKg[i])}</div>
                   <button
                     type="button"
                     className="text-slate-400 hover:text-red-600 text-center"
