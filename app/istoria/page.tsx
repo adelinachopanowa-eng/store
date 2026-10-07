@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import ListToolbar, { matchesQuery, inPeriod } from "@/components/ListToolbar";
 import { HistoryRow } from "@/lib/types";
 import { fmtKg, fmtLv, fmtDate, fmtPrice } from "@/lib/format";
 import { PageHeader, Loading, Empty } from "@/components/ui";
@@ -16,6 +17,17 @@ const TYPES = [
 
 export default function HistoryPage() {
   const [rows, setRows] = useState<HistoryRow[]>([]);
+  const [query, setQuery] = useState("");
+  const [dFrom, setDFrom] = useState("");
+  const [dTo, setDTo] = useState("");
+  const filtered = useMemo(
+    () =>
+      rows.filter(
+        (r: any) =>
+          matchesQuery(query, [r.material_name, r.supplier_name, r.type_bg, r.note]) && inPeriod(r.entry_date, dFrom, dTo)
+      ),
+    [rows, query, dFrom, dTo]
+  );
   const [loading, setLoading] = useState(true);
   const [type, setType] = useState("");
 
@@ -41,9 +53,21 @@ export default function HistoryPage() {
           </button>
         ))}
       </div>
+      <ListToolbar
+        query={query}
+        onQuery={setQuery}
+        from={dFrom}
+        onFrom={setDFrom}
+        to={dTo}
+        onTo={setDTo}
+        shown={filtered.length}
+        total={rows.length}
+        placeholder="материал, контрагент, бележка…"
+      />
+
       {loading ? (
         <Loading />
-      ) : rows.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <Empty text="Няма записи." />
       ) : (
         <div className="card overflow-x-auto">
@@ -61,7 +85,7 @@ export default function HistoryPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => {
+              {filtered.map((r) => {
                 const isIn = Number(r.quantity_kg) >= 0;
                 return (
                   <tr key={r.id} className="hover:bg-slate-50">

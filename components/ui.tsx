@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 
 export function PageHeader({
   title,
@@ -14,7 +14,7 @@ export function PageHeader({
   return (
     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
       <div>
-        <h1 className="text-2xl font-bold text-brand-700">{title}</h1>
+        <h1 className="text-2xl h-tight text-brand-700">{title}</h1>
         <div className="mt-1 h-1 w-12 rounded bg-accent-400" />
         {subtitle && <p className="text-sm text-slate-500 mt-1.5">{subtitle}</p>}
       </div>
@@ -36,12 +36,22 @@ export function Modal({
   children: ReactNode;
   wide?: boolean;
 }) {
+  // Заключва фона, докато модалът е отворен (без странично местене на телефон)
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-start justify-center bg-black/40 sm:p-4 overflow-y-auto">
-      <div className={`card w-full rounded-b-none sm:rounded-xl sm:my-8 max-h-[92vh] sm:max-h-none overflow-y-auto ${wide ? "max-w-3xl" : "max-w-lg"}`}>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-start justify-center bg-black/40 sm:p-4 overflow-y-auto overflow-x-hidden overscroll-contain">
+      <div className={`card w-full rounded-b-none sm:rounded-xl sm:my-8 max-h-[92vh] sm:max-h-none overflow-y-auto overflow-x-hidden overscroll-contain ${wide ? "max-w-3xl" : "max-w-lg"}`}>
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-5 py-3">
-          <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
+          <h2 className="text-lg h-tight-sm text-slate-900">{title}</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-700 text-2xl leading-none -mr-1 p-1">
             ×
           </button>
@@ -197,8 +207,8 @@ export function Stat({
   };
   return (
     <div className="card p-4">
-      <div className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</div>
-      <div className={`text-2xl font-bold mt-1 ${colors[color]}`}>{value}</div>
+      <div className="micro-label text-slate-500">{label}</div>
+      <div className={`text-2xl font-bold mt-1 tabular-nums ${colors[color]}`}>{value}</div>
       {sub && <div className="text-xs text-slate-400 mt-0.5">{sub}</div>}
     </div>
   );

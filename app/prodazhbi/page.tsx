@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import ListToolbar, { matchesQuery, inPeriod } from "@/components/ListToolbar";
 import { MaterialBalance, Supplier } from "@/lib/types";
 import { fmtKg, fmtLv, fmtPrice, fmtDate } from "@/lib/format";
 import {
@@ -18,9 +19,21 @@ import {
   InvoiceBadge,
 } from "@/components/ui";
 import Combobox, { ComboValue } from "@/components/Combobox";
+import MaterialPicker from "@/components/MaterialPicker";
 
 export default function SalesPage() {
   const [list, setList] = useState<any[]>([]);
+  const [query, setQuery] = useState("");
+  const [dFrom, setDFrom] = useState("");
+  const [dTo, setDTo] = useState("");
+  const filtered = useMemo(
+    () =>
+      list.filter(
+        (s: any) =>
+          matchesQuery(query, [s.doc_number, s.wh_suppliers?.name, s.buyer_name, s.wh_materials?.name]) && inPeriod(s.doc_date, dFrom, dTo)
+      ),
+    [list, query, dFrom, dTo]
+  );
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editItem, setEditItem] = useState<any | null>(null);
@@ -69,9 +82,21 @@ export default function SalesPage() {
         }
       />
 
+      <ListToolbar
+        query={query}
+        onQuery={setQuery}
+        from={dFrom}
+        onFrom={setDFrom}
+        to={dTo}
+        onTo={setDTo}
+        shown={filtered.length}
+        total={list.length}
+        placeholder="документ, купувач, материал…"
+      />
+
       {loading ? (
         <Loading />
-      ) : list.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <Empty text="Няма продажби." />
       ) : (
         <div className="card overflow-x-auto">
@@ -92,7 +117,7 @@ export default function SalesPage() {
               </tr>
             </thead>
             <tbody>
-              {list.map((s) => (
+              {filtered.map((s) => (
                 <tr key={s.id} className={`hover:bg-slate-50 ${s.voided ? "opacity-50" : ""}`}>
                   <td className="td whitespace-nowrap" data-label="Дата">{fmtDate(s.doc_date)}</td>
                   <td className="td" data-label="№">{s.doc_number || "—"}</td>
@@ -306,31 +331,29 @@ function SaleModal({
   return (
     <Modal open={open} onClose={onClose} title={isEdit ? "Редакция на продажба" : "Нова продажба / експедиция"} wide>
       <div className="space-y-4">
-        <FormGrid cols={2}>
-          <Field label="Материал" required={!isEdit}>
-            <select
-              className="input"
-              value={materialId}
-              onChange={(e) => setMaterialId(e.target.value)}
-              disabled={isEdit}
-            >
-              <option value="">— изберете —</option>
-              {materials.map((m) => (
-                <option key={m.material_id} value={m.material_id}>
-                  {m.material_name} · {fmtKg(m.quantity_kg)} · {fmtPrice(m.avg_price)}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Купувач" hint="изберете от базата или въведете нов">
-            <Combobox
-              items={customers.map((c) => ({ id: c.id, name: c.name }))}
-              value={buyer}
-              onChange={setBuyer}
-              placeholder="Име на купувач"
-            />
-          </Field>
-        </FormGrid>
+        <Field label="Материал" required={!isEdit}>
+          <MaterialPicker
+            all={materials.map((m) => ({ id: m.material_id, name: m.material_name }))}
+            inStock={materials.map((m) => ({ id: m.material_id, name: m.material_name, qty: Number(m.quantity_kg) }))}
+            value={{
+              id: materialId || null,
+              name: materials.find((m) => m.material_id === materialId)?.material_name || "",
+            }}
+            onChange={(v) => setMaterialId(v.id || "")}
+            placeholder="Търси материал…"
+            allowCreate={false}
+            disabled={isEdit}
+          />
+        </Field>
+
+        <Field label="Купувач" hint="изберете от базата или въведете нов">
+          <Combobox
+            items={customers.map((c) => ({ id: c.id, name: c.name }))}
+            value={buyer}
+            onChange={setBuyer}
+            placeholder="Име на купувач"
+          />
+        </Field>
 
         <FormGrid cols={3}>
           <Field label="Количество (т)" required={!isEdit}>

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import ListToolbar, { matchesQuery, inPeriod } from "@/components/ListToolbar";
 import { Supplier, Material, ClientMaterial } from "@/lib/types";
 import { fmtKg, fmtLv, fmtDate } from "@/lib/format";
 import {
@@ -17,6 +18,8 @@ import {
   VoidButton,
 } from "@/components/ui";
 import Combobox, { ComboValue } from "@/components/Combobox";
+import MaterialPicker from "@/components/MaterialPicker";
+import PhotoUpload from "@/components/PhotoUpload";
 
 const kgRaw = (n: number | null | undefined) =>
   (n ?? 0).toLocaleString("bg-BG", { maximumFractionDigits: 0 }) + " кг";
@@ -32,22 +35,36 @@ const emptyLine = (): Line => ({ clientMat: { id: null, name: "" }, mat: { id: n
 
 export default function WeighNotesPage() {
   const [list, setList] = useState<any[]>([]);
+  const [query, setQuery] = useState("");
+  const [dFrom, setDFrom] = useState("");
+  const [dTo, setDTo] = useState("");
+  const filtered = useMemo(
+    () =>
+      list.filter(
+        (d: any) =>
+          matchesQuery(query, [d.seq_no, d.vehicle_reg, d.driver_name, d.wh_suppliers?.name, d.supplier_name, ...(d.wh_delivery_allocations||[]).flatMap((a:any)=>[a.client_name, a.wh_materials?.name])]) && inPeriod(d.weighed_at || d.doc_date, dFrom, dTo)
+      ),
+    [list, query, dFrom, dTo]
+  );
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editItem, setEditItem] = useState<any | null>(null);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [clientMaterials, setClientMaterials] = useState<ClientMaterial[]>([]);
+  const [balances, setBalances] = useState<any[]>([]);
 
   async function loadRefs() {
-    const [s, m, c] = await Promise.all([
+    const [s, m, c, b] = await Promise.all([
       supabase.from("wh_suppliers").select("*").eq("active", true).order("name"),
       supabase.from("wh_materials").select("*").eq("active", true).order("name"),
       supabase.from("wh_client_materials").select("*").eq("active", true).order("name"),
+      supabase.from("wh_material_balances").select("material_id, material_name, quantity_kg"),
     ]);
     setSuppliers((s.data as Supplier[]) || []);
     setMaterials((m.data as Material[]) || []);
     setClientMaterials((c.data as ClientMaterial[]) || []);
+    setBalances(b.data || []);
   }
   async function loadList() {
     setLoading(true);
@@ -78,9 +95,21 @@ export default function WeighNotesPage() {
         }
       />
 
+      <ListToolbar
+        query={query}
+        onQuery={setQuery}
+        from={dFrom}
+        onFrom={setDFrom}
+        to={dTo}
+        onTo={setDTo}
+        shown={filtered.length}
+        total={list.length}
+        placeholder="№, рег. №, клиент, материал…"
+      />
+
       {loading ? (
         <Loading />
-      ) : list.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <Empty text="Няма издадени кантарни бележки." />
       ) : (
         <div className="card overflow-x-auto">
@@ -99,7 +128,7 @@ export default function WeighNotesPage() {
               </tr>
             </thead>
             <tbody>
-              {list.map((d) => {
+              {filtered.map((d) => {
                 const lines = d.wh_delivery_allocations || [];
                 const mats = lines.map((a: any) => a.client_name || a.wh_materials?.name).filter(Boolean);
                 const matLabel = mats.length <= 1 ? (mats[0] || "—") : `${mats[0]} +${mats.length - 1}`;
@@ -155,6 +184,7 @@ export default function WeighNotesPage() {
         suppliers={suppliers}
         materials={materials}
         clientMaterials={clientMaterials}
+        balances={balances}
         onSaved={() => { loadList(); loadRefs(); }}
       />
     </div>
@@ -168,6 +198,7 @@ function WeighModal({
   suppliers,
   materials,
   clientMaterials,
+  balances,
   onSaved,
 }: {
   open: boolean;
@@ -176,6 +207,7 @@ function WeighModal({
   suppliers: Supplier[];
   materials: Material[];
   clientMaterials: ClientMaterial[];
+  balances: any[];
   onSaved: () => void;
 }) {
   const isEdit = !!editItem;
@@ -188,6 +220,7 @@ function WeighModal({
   const [pay, setPay] = useState<"cash" | "bank">("cash");
   const [paid, setPaid] = useState(false);
   const [note, setNote] = useState("");
+  const [photos, setPhotos] = useState<string[]>([]);
   const [lines, setLines] = useState<Line[]>([emptyLine()]);
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);
@@ -207,6 +240,7 @@ function WeighModal({
       setPay(editItem.payment_method || "cash");
       setPaid(!!editItem.paid);
       setNote(editItem.note || "");
+      setPhotos(editItem.photo_paths || []);
       const al = (editItem.wh_delivery_allocations || []) as any[];
       setLines(
         al.length
@@ -362,8 +396,13 @@ function WeighModal({
                         />
                       </Field>
                       <Field label="Вътрешна номенклатура (за склада)">
-                        <Combobox
-                          items={materials.map((m) => ({ id: m.id, name: m.name }))}
+                        <MaterialPicker
+                          all={materials.map((m) => ({ id: m.id, name: m.name }))}
+                          inStock={balances.map((b: any) => ({
+                            id: b.material_id,
+                            name: b.material_name,
+                            qty: Number(b.quantity_kg),
+                          }))}
                           value={l.mat}
                           onChange={(v) => setLine(i, { mat: v })}
                           placeholder="Вътрешен материал"
@@ -434,6 +473,21 @@ function WeighModal({
 
         <Field label="Бележка">
           <input className="input" value={note} onChange={(e) => setNote(e.target.value)} />
+        </Field>
+
+        <Field label="Снимки">
+          {isEdit ? (
+            <PhotoUpload
+              folder={`deliveries/${editItem.id}`}
+              paths={photos}
+              onChange={async (next) => {
+                setPhotos(next);
+                await supabase.from("wh_deliveries").update({ photo_paths: next }).eq("id", editItem.id);
+              }}
+            />
+          ) : (
+            <p className="text-xs text-slate-400">Снимки могат да се добавят след запис на бележката.</p>
+          )}
         </Field>
 
         <FormError msg={err} />

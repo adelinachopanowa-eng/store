@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import ListToolbar, { matchesQuery, inPeriod } from "@/components/ListToolbar";
 import { MaterialBalance } from "@/lib/types";
 import { fmtKg, fmtLv, fmtPrice, fmtDate } from "@/lib/format";
 import {
@@ -19,6 +20,17 @@ import {
 
 export default function TransfersPage() {
   const [list, setList] = useState<any[]>([]);
+  const [query, setQuery] = useState("");
+  const [dFrom, setDFrom] = useState("");
+  const [dTo, setDTo] = useState("");
+  const filtered = useMemo(
+    () =>
+      list.filter(
+        (t: any) =>
+          matchesQuery(query, [t.from_mat?.name, t.to_mat?.name, t.note]) && inPeriod(t.doc_date, dFrom, dTo)
+      ),
+    [list, query, dFrom, dTo]
+  );
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editItem, setEditItem] = useState<any | null>(null);
@@ -62,9 +74,21 @@ export default function TransfersPage() {
         }
       />
 
+      <ListToolbar
+        query={query}
+        onQuery={setQuery}
+        from={dFrom}
+        onFrom={setDFrom}
+        to={dTo}
+        onTo={setDTo}
+        shown={filtered.length}
+        total={list.length}
+        placeholder="материал, бележка…"
+      />
+
       {loading ? (
         <Loading />
-      ) : list.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <Empty text="Няма пресортирания." />
       ) : (
         <div className="card overflow-x-auto">
@@ -82,7 +106,7 @@ export default function TransfersPage() {
               </tr>
             </thead>
             <tbody>
-              {list.map((t) => (
+              {filtered.map((t) => (
                 <tr key={t.id} className={`hover:bg-slate-50 ${t.voided ? "opacity-50" : ""}`}>
                   <td className="td whitespace-nowrap" data-label="Дата">{fmtDate(t.doc_date)}</td>
                   <td className="td" data-label="От материал">{t.from_mat?.name || "—"}</td>

@@ -30,7 +30,7 @@ body {
     @apply w-full rounded-lg border border-slate-300 px-3 py-2 text-sm min-h-[42px] focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600;
   }
   .label {
-    @apply block text-sm font-medium text-slate-600 mb-1;
+    @apply block text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-slate-500 mb-1;
   }
   .card {
     @apply rounded-xl bg-white shadow-sm border border-slate-200;
@@ -39,10 +39,20 @@ body {
     @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium;
   }
   .th {
-    @apply px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide bg-brand-600 text-white;
+    @apply px-3 py-2 text-left text-[0.7rem] font-semibold uppercase tracking-[0.08em] bg-brand-600 text-white;
   }
   .td {
-    @apply px-3 py-2 text-sm text-slate-700 border-t border-slate-100;
+    @apply px-3 py-2 text-sm text-slate-700 border-t border-slate-100 tabular-nums;
+  }
+  /* Стегнати заглавия срещу широко разредени микро-етикети */
+  .h-tight {
+    @apply font-semibold tracking-[-0.025em] leading-tight;
+  }
+  .h-tight-sm {
+    @apply font-semibold tracking-[-0.015em] leading-tight;
+  }
+  .micro-label {
+    @apply text-[0.7rem] font-semibold uppercase tracking-[0.08em];
   }
 }
 

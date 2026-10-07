@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import ListToolbar, { matchesQuery, inPeriod } from "@/components/ListToolbar";
 import { MaterialBalance, Supplier } from "@/lib/types";
 import { fmtKg, fmtLv, fmtPrice, fmtDate } from "@/lib/format";
 import {
@@ -18,6 +19,8 @@ import {
   InvoiceBadge,
 } from "@/components/ui";
 import Combobox, { ComboValue } from "@/components/Combobox";
+import MaterialPicker from "@/components/MaterialPicker";
+import PhotoUpload from "@/components/PhotoUpload";
 
 type Alloc = { mat: ComboValue; mode: "pct" | "kg"; amount: string };
 const emptyMat: ComboValue = { id: null, name: "" };
@@ -39,6 +42,17 @@ function matLabel(d: any) {
 
 export default function DeliveriesPage() {
   const [list, setList] = useState<any[]>([]);
+  const [query, setQuery] = useState("");
+  const [dFrom, setDFrom] = useState("");
+  const [dTo, setDTo] = useState("");
+  const filtered = useMemo(
+    () =>
+      list.filter(
+        (d: any) =>
+          matchesQuery(query, [d.seq_no, d.doc_number, d.wh_suppliers?.name, d.supplier_name, ...(d.wh_delivery_allocations||[]).flatMap((a:any)=>[a.client_name, a.wh_materials?.name])]) && inPeriod(d.doc_date, dFrom, dTo)
+      ),
+    [list, query, dFrom, dTo]
+  );
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editItem, setEditItem] = useState<any | null>(null);
@@ -88,9 +102,21 @@ export default function DeliveriesPage() {
         }
       />
 
+      <ListToolbar
+        query={query}
+        onQuery={setQuery}
+        from={dFrom}
+        onFrom={setDFrom}
+        to={dTo}
+        onTo={setDTo}
+        shown={filtered.length}
+        total={list.length}
+        placeholder="№, документ, доставчик, материал…"
+      />
+
       {loading ? (
         <Loading />
-      ) : list.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <Empty text="Няма въведени доставки." />
       ) : (
         <div className="card overflow-x-auto">
@@ -111,11 +137,16 @@ export default function DeliveriesPage() {
               </tr>
             </thead>
             <tbody>
-              {list.map((d) => (
+              {filtered.map((d) => (
                 <tr key={d.id} className={`hover:bg-slate-50 ${d.voided ? "opacity-50" : ""}`}>
                   <td data-label="Скл. №" className="td font-semibold text-slate-700">{d.seq_no ?? "—"}</td>
                   <td data-label="Дата" className="td whitespace-nowrap">{fmtDate(d.doc_date)}</td>
-                  <td data-label="Документ №" className="td">{d.doc_number || "—"}</td>
+                  <td data-label="Документ №" className="td">
+                    {d.doc_number || "—"}
+                    {(d.photo_paths?.length ?? 0) > 0 && (
+                      <span className="ml-1 text-slate-400" title={`${d.photo_paths.length} снимки`}>📷</span>
+                    )}
+                  </td>
                   <td data-label="Доставчик" className="td">{d.wh_suppliers?.name || d.supplier_name || "—"}</td>
                   <td data-label="Материал" className="td">{matLabel(d)}</td>
                   <td data-label="Нето" className="td text-right">{fmtKg(d.net_quantity)}</td>
@@ -205,6 +236,7 @@ function DeliveryModal({
   const [docNumber, setDocNumber] = useState("");
   const [docDate, setDocDate] = useState("");
   const [note, setNote] = useState("");
+  const [photos, setPhotos] = useState<string[]>([]);
   const [allocs, setAllocs] = useState<Alloc[]>([{ mat: { ...emptyMat }, mode: "pct", amount: "100" }]);
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);
@@ -229,6 +261,7 @@ function DeliveryModal({
       setDocNumber(editItem.doc_number || "");
       setDocDate(editItem.doc_date ? editItem.doc_date.slice(0, 10) : "");
       setNote(editItem.note || "");
+      setPhotos(editItem.photo_paths || []);
       setAllocs([{ mat: { ...emptyMat }, mode: "pct", amount: "100" }]);
     } else {
       setSupplier({ id: null, name: "" });
@@ -397,8 +430,9 @@ function DeliveryModal({
               {allocs.map((a, i) => (
                 <div key={i} className="grid grid-cols-[72px_minmax(0,1fr)_auto_28px] sm:grid-cols-[1fr_84px_104px_96px_32px] gap-2 items-center rounded-lg border border-slate-100 p-2 sm:border-0 sm:p-0">
                   <div className="col-span-full sm:col-span-1">
-                  <Combobox
-                    items={materials.map((m) => ({ id: m.material_id, name: m.material_name }))}
+                  <MaterialPicker
+                    all={materials.map((m) => ({ id: m.material_id, name: m.material_name }))}
+                    inStock={materials.map((m) => ({ id: m.material_id, name: m.material_name, qty: Number(m.quantity_kg) }))}
                     value={a.mat}
                     onChange={(v) => {
                       const c = [...allocs];
@@ -492,6 +526,21 @@ function DeliveryModal({
 
         <Field label="Бележка">
           <input className="input" value={note} onChange={(e) => setNote(e.target.value)} />
+        </Field>
+
+        <Field label="Снимки">
+          {isEdit ? (
+            <PhotoUpload
+              folder={`deliveries/${editItem.id}`}
+              paths={photos}
+              onChange={async (next) => {
+                setPhotos(next);
+                await supabase.from("wh_deliveries").update({ photo_paths: next }).eq("id", editItem.id);
+              }}
+            />
+          ) : (
+            <p className="text-xs text-slate-400">Снимки могат да се добавят след запис на доставката.</p>
+          )}
         </Field>
 
         <FormError msg={err} />
