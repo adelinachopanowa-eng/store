@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Supplier } from "@/lib/types";
-import { fmtKg, fmtLv, fmtDate } from "@/lib/format";
+import { fmtKg, fmtLv, fmtPrice, fmtDate } from "@/lib/format";
 import { PageHeader, Loading, Empty, Stat } from "@/components/ui";
 
 type Doc = {
@@ -13,6 +13,7 @@ type Doc = {
   ref: string;
   material: string;
   qty: number;
+  price: number | null;
   value: number | null;
   paid: boolean;
 };
@@ -27,6 +28,10 @@ type Party = {
   unpaid: number;
   docs: Doc[];
 };
+
+/** Единична цена: от документа, иначе изчислена от стойност ÷ количество. */
+const unitPrice = (direct: any, value: number | null, qty: number) =>
+  direct != null ? Number(direct) : value != null && qty > 0 ? value / qty : null;
 
 const partyKey = (supplierId: string | null | undefined, name: string | null | undefined) =>
   supplierId ? "sup:" + supplierId : "name:" + (name || "—");
@@ -86,6 +91,11 @@ export default function CounterpartiesPage() {
         ref: d.seq_no != null ? `#${d.seq_no}` : d.doc_number || "—",
         material: mats.length ? (mats.length > 1 ? `${mats[0]} +${mats.length - 1}` : mats[0]) : "—",
         qty: Number(d.net_quantity || 0),
+        price: unitPrice(
+          d.unit_price,
+          d.total_value != null ? Number(d.total_value) : null,
+          Number(d.net_quantity || 0)
+        ),
         value: d.total_value != null ? Number(d.total_value) : null,
         paid: !!d.paid,
       });
@@ -104,6 +114,11 @@ export default function CounterpartiesPage() {
         ref: s.doc_number || "—",
         material: s.wh_materials?.name || "—",
         qty: Number(s.quantity_kg || 0),
+        price: unitPrice(
+          s.unit_price,
+          s.sale_value != null ? Number(s.sale_value) : null,
+          Number(s.quantity_kg || 0)
+        ),
         value: s.sale_value != null ? Number(s.sale_value) : null,
         paid: !!s.paid,
       });
@@ -216,7 +231,7 @@ function PartyDetail({ party, onBack }: { party: Party; onBack: () => void }) {
         <Empty text="Няма движения за последните 12 месеца." />
       ) : (
         <div className="card overflow-x-auto">
-          <table className="w-full min-w-[720px] rtable">
+          <table className="w-full min-w-[820px] rtable">
             <thead>
               <tr>
                 <th className="th">Тип</th>
@@ -224,6 +239,7 @@ function PartyDetail({ party, onBack }: { party: Party; onBack: () => void }) {
                 <th className="th">Документ</th>
                 <th className="th">Материал</th>
                 <th className="th text-right">Количество</th>
+                <th className="th text-right">Цена/т</th>
                 <th className="th text-right">Стойност</th>
                 <th className="th">Плащане</th>
               </tr>
@@ -236,6 +252,9 @@ function PartyDetail({ party, onBack }: { party: Party; onBack: () => void }) {
                   <td className="td" data-label="Документ">{d.ref}</td>
                   <td className="td" data-label="Материал">{d.material}</td>
                   <td className="td text-right" data-label="Количество">{fmtKg(d.qty)}</td>
+                  <td className="td text-right" data-label="Цена/т">
+                    {d.price != null ? fmtPrice(d.price) : "—"}
+                  </td>
                   <td className="td text-right font-medium" data-label="Стойност">
                     {d.value != null ? fmtLv(d.value) : "—"}
                   </td>
